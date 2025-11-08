@@ -31,10 +31,10 @@ flowchart LR
     CRM -- "publish\nAll_Clients" --> GCP
     CRM -- "publish\nAll_Clients" --> BI
 
-    GCP -- "publish\nGiftCertificates.Stream" --> IM
-    GCP -- "publish\nGiftCertificates.Stream" --> POS
-    GCP -- "publish\nGiftCertificates.Stream" --> CRM
-    GCP -- "publish\nGiftCertificates.Stream" --> BI
+    GCP -- "publish\nGiftCertificates.Stream\n(GiftCertificate state)" --> IM
+    GCP -- "publish\nGiftCertificates.Stream\n(GiftCertificate state)" --> POS
+    GCP -- "publish\nGiftCertificates.Stream\n(GiftCertificate state)" --> CRM
+    GCP -- "publish\nGiftCertificates.Stream\n(GiftCertificate state)" --> BI
 
     CRM -- "HTTP\nGET /certificates/{id}/cvc" --> GCP
     CRM -- "send CVC\n(письмо/SMS)" --> Customer

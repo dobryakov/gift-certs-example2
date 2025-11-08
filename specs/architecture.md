@@ -17,22 +17,22 @@
 | `All_SalesOrder` | ИМ, POS (через Orders) | BI, GCP Service | События о создании/изменении заказов, включая строки с подарочными сертификатами |
 | `All_Payments` | ИМ, POS (через Payments) | BI, GCP Service | Платёжные события (авторизация, списание, возврат) |
 | `All_Clients` | CRM | BI, GCP Service | Клиентские данные |
-| `GiftCertificates.Stream` | GCP Service | ИМ, POS, CRM, BI | Единый поток событий сертификатов (issue, redemption, notification, audit, alerts) |
+| `GiftCertificates.Stream` | GCP Service | ИМ, POS, CRM, BI | Единый поток состояний объектов `GiftCertificate` (ISSUED, PARTIALLY_REDEEMED, REDEEMED, REFUND_PENDING, REFUNDED, LOCKED, NOTIFICATION_REQUESTED, NOTIFICATION_SENT, ALERT и др.) |
 
 Расширения BI выполняются за счёт подписки на новые топики без создания отдельного потока.
 
 ## Взаимодействия
 
 - ИМ и POS при оформлении заказа вызывают HTTP-метод GCP Service `GET /certificates/next` для резервирования следующего сертификата, затем создают запись заказа в `All_SalesOrder` и платежное событие в `All_Payments`.
-- GCP Service подписывается на `All_SalesOrder` и `All_Payments`, сопоставляет события, обновляет состояние сертификатов и публикует единый ответный поток в `GiftCertificates.Stream` (`eventType`, `channel`, `status`, `payload`).
-- CRM получает событие `notification.requested` из `GiftCertificates.Stream`, далее обращается к GCP Service (`GET /certificates/{id}/cvc`) для получения CVC и отправляет сообщение клиенту.
-- Возвраты фиксируются каналами через события `All_SalesOrder`/`All_Payments`; GCP Service реагирует на них и публикует `refund`-события в `GiftCertificates.Stream` без дополнительных HTTP-вызовов к Payments.
+- GCP Service подписывается на `All_SalesOrder` и `All_Payments`, сопоставляет события, обновляет состояние сертификатов и публикует объект `GiftCertificate` в `GiftCertificates.Stream` с обновлённым статусом (`status`, `channel`, агрегированные атрибуты).
+- CRM получает состояние `GiftCertificate` со статусом `NOTIFICATION_REQUESTED` из `GiftCertificates.Stream`, далее обращается к GCP Service (`GET /certificates/{id}/cvc`) для получения CVC и после отправки фиксирует статус `NOTIFICATION_SENT`.
+- Возвраты фиксируются каналами через события `All_SalesOrder`/`All_Payments`; GCP Service реагирует на них и публикует `GiftCertificate` в статусах `REFUND_PENDING`/`REFUNDED` без дополнительных HTTP-вызовов к Payments.
 
 ## Обработка исключительных сценариев
 
-- При отсутствии доступных сертификатов в пуле метод `get next cert` возвращает ошибку `409`, а GCP Service публикует событие `issue.blocked` в `GiftCertificates.Stream`.
-- При невозможности возврата по платёжному событию GCP Service публикует `refund.pendingDetails` и обновляет соответствующие атрибуты; CRM или поддержка инициируют дальнейшие шаги.
-- Все ошибки транслируются через `GiftCertificates.Stream` с типами `error`/`alert`, что позволяет BI и службам поддержки мониторить отклонения.
+- При отсутствии доступных сертификатов в пуле метод `get next cert` возвращает ошибку `409`, а GCP Service публикует `GiftCertificate` со статусом `ISSUE_BLOCKED` в `GiftCertificates.Stream`.
+- При невозможности возврата по платёжному событию GCP Service публикует `GiftCertificate` со статусом `REFUND_PENDING` и обновляет соответствующие атрибуты; CRM или поддержка инициируют дальнейшие шаги.
+- Все ошибки транслируются через `GiftCertificates.Stream` в виде состояний `ALERT`/`ERROR`, что позволяет BI и службам поддержки мониторить отклонения.
 
 ## Диаграммы
 
@@ -41,5 +41,5 @@
 ## Дополнительные замечания
 
 - Архитектура обеспечивает слабое зацепление команд и сервисов благодаря событийной шине и позволяет масштабировать обработку сертификатов по каналам независимо.
-- Консолидация событий в `GiftCertificates.Stream` упрощает интеграции и BI, при этом тип события и канал указываются в payload для фильтрации.
+- Консолидация состояний в `GiftCertificates.Stream` упрощает интеграции и BI, при этом статус и канал указываются в payload для фильтрации.
 - Прямые HTTP-вызовы к Payments не используются; расчёты и возвраты фиксируются исключительно через `All_Payments`.

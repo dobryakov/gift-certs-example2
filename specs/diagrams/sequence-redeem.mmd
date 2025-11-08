@@ -13,7 +13,7 @@ sequenceDiagram
     Orders-->>GCP: Событие заказа
     Payments-->>GCP: Событие платежа
     GCP->>GCP: Пересчёт остатка сертификата
-    GCP-->>POS: Событие GiftCertificates.Stream {eventType=redeem.partial}
-    GCP-->>BI: Событие GiftCertificates.Stream {eventType=redeem.partial}
-    GCP-->>Orders: Enriched событие (через GiftCertificates.Stream, metadata link)
+    GCP-->>POS: Состояние GiftCertificate {status=PARTIALLY_REDEEMED}
+    GCP-->>BI: Состояние GiftCertificate {status=PARTIALLY_REDEEMED}
+    GCP-->>Orders: Обогащённое состояние (metadata, ссылка на заказ)
 

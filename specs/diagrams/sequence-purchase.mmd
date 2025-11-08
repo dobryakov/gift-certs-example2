@@ -16,10 +16,10 @@ sequenceDiagram
     Orders-->>GCP: Событие заказа
     Payments-->>GCP: Событие платежа (approved)
     GCP->>GCP: Обновление состояния сертификата
-    GCP-->>IM: Событие GiftCertificates.Stream {eventType=issued}
-    GCP-->>CRM: Событие GiftCertificates.Stream {eventType=notification.requested}
+    GCP-->>IM: Состояние GiftCertificate {status=ISSUED}
+    GCP-->>CRM: Состояние GiftCertificate {status=NOTIFICATION_REQUESTED}
     CRM->>GCP: HTTP GET /certificates/{id}/cvc
     GCP-->>CRM: CVC в защищённом ответе
     CRM-->>Customer: Отправка CVC (email/SMS)
-    GCP-->>BI: Событие GiftCertificates.Stream {eventType=issued}
+    GCP-->>BI: Состояние GiftCertificate {status=ISSUED}
 
