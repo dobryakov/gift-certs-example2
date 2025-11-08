@@ -8,131 +8,159 @@
   <bpmn:process id="Process_GiftCertificateLifecycle" isExecutable="false">
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_InternetStore" name="Internet Store">
-        <bpmn:flowNodeRef>StartEvent_OrderCreated</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_SendIssueCommand</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>EndEvent_OrderComplete</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>StartEvent_OrderRequested</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestNextCert</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PublishOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PublishPayment</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_GCP" name="Сервис Процессинга Подарочных Сертификатов">
-        <bpmn:flowNodeRef>Task_ValidateCommand</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>ExclusiveGateway_ChannelCheck</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_GenerateCertificate</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_RequestPaymentFix</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_PublishEvents</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReserveCertificate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_PoolAvailable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CorrelateEvents</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PublishStream</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Payments" name="Payments">
-        <bpmn:flowNodeRef>Task_FixPayment</bpmn:flowNodeRef>
+      <bpmn:lane id="Lane_Bus" name="Orders &amp; Payments">
+        <bpmn:flowNodeRef>Task_RouteOrderEvent</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RoutePaymentEvent</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_CRM" name="CRM">
+        <bpmn:flowNodeRef>Task_RequestCVC</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_SendCVC</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_BI" name="BI Platform">
-        <bpmn:flowNodeRef>Task_ConsumeAudit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UpdateAnalytics</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_OrderComplete</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
 
-    <bpmn:startEvent id="StartEvent_OrderCreated" name="Заказ оформлен">
-      <bpmn:outgoing>Flow_Start_To_Command</bpmn:outgoing>
+    <bpmn:startEvent id="StartEvent_OrderRequested" name="Запрос на оформление">
+      <bpmn:outgoing>Flow_Start_To_RequestNext</bpmn:outgoing>
     </bpmn:startEvent>
 
-    <bpmn:task id="Task_SendIssueCommand" name="Отправить команду issueCertificate">
-      <bpmn:incoming>Flow_Start_To_Command</bpmn:incoming>
-      <bpmn:outgoing>Flow_Command_To_Validate</bpmn:outgoing>
+    <bpmn:task id="Task_RequestNextCert" name="GET /certificates/next">
+      <bpmn:incoming>Flow_Start_To_RequestNext</bpmn:incoming>
+      <bpmn:outgoing>Flow_RequestNext_To_Reserve</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Start_To_Command" sourceRef="StartEvent_OrderCreated" targetRef="Task_SendIssueCommand"/>
+    <bpmn:sequenceFlow id="Flow_Start_To_RequestNext" sourceRef="StartEvent_OrderRequested" targetRef="Task_RequestNextCert"/>
 
-    <bpmn:task id="Task_ValidateCommand" name="Провести бизнес-валидацию">
-      <bpmn:incoming>Flow_Command_To_Validate</bpmn:incoming>
-      <bpmn:outgoing>Flow_Validate_To_Gateway</bpmn:outgoing>
+    <bpmn:task id="Task_ReserveCertificate" name="Зарезервировать сертификат из пула">
+      <bpmn:incoming>Flow_RequestNext_To_Reserve</bpmn:incoming>
+      <bpmn:outgoing>Flow_Reserve_To_Gateway</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Command_To_Validate" sourceRef="Task_SendIssueCommand" targetRef="Task_ValidateCommand"/>
+    <bpmn:sequenceFlow id="Flow_RequestNext_To_Reserve" sourceRef="Task_RequestNextCert" targetRef="Task_ReserveCertificate"/>
 
-    <bpmn:exclusiveGateway id="ExclusiveGateway_ChannelCheck" name="Канал разрешён?">
-      <bpmn:incoming>Flow_Validate_To_Gateway</bpmn:incoming>
-      <bpmn:outgoing>Flow_Gateway_To_Generate</bpmn:outgoing>
-      <bpmn:outgoing>Flow_Gateway_To_End</bpmn:outgoing>
+    <bpmn:exclusiveGateway id="Gateway_PoolAvailable" name="Сертификат доступен?">
+      <bpmn:incoming>Flow_Reserve_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Gateway_To_Order</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Gateway_To_Block</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:sequenceFlow id="Flow_Validate_To_Gateway" sourceRef="Task_ValidateCommand" targetRef="ExclusiveGateway_ChannelCheck"/>
+    <bpmn:sequenceFlow id="Flow_Reserve_To_Gateway" sourceRef="Task_ReserveCertificate" targetRef="Gateway_PoolAvailable"/>
 
-    <bpmn:task id="Task_GenerateCertificate" name="Создать сертификат и CVC">
-      <bpmn:incoming>Flow_Gateway_To_Generate</bpmn:incoming>
-      <bpmn:outgoing>Flow_Generate_To_FixPayment</bpmn:outgoing>
+    <bpmn:intermediateThrowEvent id="IntermediateEvent_BlockIssue" name="GiftCertificates.Stream: issue.blocked">
+      <bpmn:incoming>Flow_Gateway_To_Block</bpmn:incoming>
+      <bpmn:outgoing>Flow_Block_To_End</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Block" sourceRef="Gateway_PoolAvailable" targetRef="IntermediateEvent_BlockIssue"/>
+
+    <bpmn:endEvent id="EndEvent_PoolEmpty" name="Запас исчерпан">
+      <bpmn:incoming>Flow_Block_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Block_To_End" sourceRef="IntermediateEvent_BlockIssue" targetRef="EndEvent_PoolEmpty"/>
+
+    <bpmn:task id="Task_PublishOrder" name="Публикация заказа в All_SalesOrder">
+      <bpmn:incoming>Flow_Gateway_To_Order</bpmn:incoming>
+      <bpmn:outgoing>Flow_Order_To_Bus</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Gateway_To_Generate" sourceRef="ExclusiveGateway_ChannelCheck" targetRef="Task_GenerateCertificate"/>
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Order" sourceRef="Gateway_PoolAvailable" targetRef="Task_PublishOrder"/>
 
-    <bpmn:task id="Task_RequestPaymentFix" name="Запросить фиксацию платежа">
-      <bpmn:incoming>Flow_Generate_To_FixPayment</bpmn:incoming>
-      <bpmn:outgoing>Flow_Request_To_FixPayment</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_Order_To_Bus" sourceRef="Task_PublishOrder" targetRef="Task_RouteOrderEvent"/>
+
+    <bpmn:task id="Task_PublishPayment" name="Публикация платежа в All_Payments">
+      <bpmn:incoming>Flow_Bus_To_PublishPayment</bpmn:incoming>
+      <bpmn:outgoing>Flow_PublishPayment_To_Bus</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Generate_To_FixPayment" sourceRef="Task_GenerateCertificate" targetRef="Task_RequestPaymentFix"/>
+    <bpmn:sequenceFlow id="Flow_Bus_To_PublishPayment" sourceRef="Task_RouteOrderEvent" targetRef="Task_PublishPayment"/>
 
-    <bpmn:task id="Task_FixPayment" name="Зафиксировать платёж">
-      <bpmn:incoming>Flow_Request_To_FixPayment</bpmn:incoming>
-      <bpmn:outgoing>Flow_FixPayment_To_Publish</bpmn:outgoing>
+    <bpmn:sequenceFlow id="Flow_PublishPayment_To_Bus" sourceRef="Task_PublishPayment" targetRef="Task_RoutePaymentEvent"/>
+
+    <bpmn:task id="Task_RouteOrderEvent" name="Orders: маршрутизация события">
+      <bpmn:incoming>Flow_Order_To_Bus</bpmn:incoming>
+      <bpmn:outgoing>Flow_Bus_To_PublishPayment</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Request_To_FixPayment" sourceRef="Task_RequestPaymentFix" targetRef="Task_FixPayment"/>
-
-    <bpmn:task id="Task_PublishEvents" name="Опубликовать события выпуска">
-      <bpmn:incoming>Flow_FixPayment_To_Publish</bpmn:incoming>
-      <bpmn:outgoing>Flow_Publish_To_CRM</bpmn:outgoing>
-      <bpmn:outgoing>Flow_Publish_To_BI</bpmn:outgoing>
-      <bpmn:outgoing>Flow_Publish_To_End</bpmn:outgoing>
+    <bpmn:task id="Task_RoutePaymentEvent" name="Payments: маршрутизация события">
+      <bpmn:incoming>Flow_PublishPayment_To_Bus</bpmn:incoming>
+      <bpmn:outgoing>Flow_Payment_To_Correlate</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_FixPayment_To_Publish" sourceRef="Task_FixPayment" targetRef="Task_PublishEvents"/>
+    <bpmn:sequenceFlow id="Flow_Payment_To_Correlate" sourceRef="Task_RoutePaymentEvent" targetRef="Task_CorrelateEvents"/>
+
+    <bpmn:task id="Task_CorrelateEvents" name="Корреляция заказа и платежа">
+      <bpmn:incoming>Flow_Payment_To_Correlate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Correlate_To_Stream</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task id="Task_PublishStream" name="GiftCertificates.Stream: issue + notification.requested">
+      <bpmn:incoming>Flow_Correlate_To_Stream</bpmn:incoming>
+      <bpmn:outgoing>Flow_Stream_To_CRM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Stream_To_BI</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:sequenceFlow id="Flow_Correlate_To_Stream" sourceRef="Task_CorrelateEvents" targetRef="Task_PublishStream"/>
+
+    <bpmn:task id="Task_RequestCVC" name="GET /certificates/{id}/cvc">
+      <bpmn:incoming>Flow_Stream_To_CRM</bpmn:incoming>
+      <bpmn:outgoing>Flow_CRM_To_Send</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:sequenceFlow id="Flow_Stream_To_CRM" sourceRef="Task_PublishStream" targetRef="Task_RequestCVC"/>
 
     <bpmn:task id="Task_SendCVC" name="Отправить CVC клиенту">
-      <bpmn:incoming>Flow_Publish_To_CRM</bpmn:incoming>
+      <bpmn:incoming>Flow_CRM_To_Send</bpmn:incoming>
       <bpmn:outgoing>Flow_CRM_To_End</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Publish_To_CRM" sourceRef="Task_PublishEvents" targetRef="Task_SendCVC"/>
+    <bpmn:sequenceFlow id="Flow_CRM_To_Send" sourceRef="Task_RequestCVC" targetRef="Task_SendCVC"/>
 
-    <bpmn:task id="Task_ConsumeAudit" name="Принять событие Audit">
-      <bpmn:incoming>Flow_Publish_To_BI</bpmn:incoming>
+    <bpmn:task id="Task_UpdateAnalytics" name="Обновить витрины (BI)">
+      <bpmn:incoming>Flow_Stream_To_BI</bpmn:incoming>
       <bpmn:outgoing>Flow_BI_To_End</bpmn:outgoing>
     </bpmn:task>
 
-    <bpmn:sequenceFlow id="Flow_Publish_To_BI" sourceRef="Task_PublishEvents" targetRef="Task_ConsumeAudit"/>
-
-    <bpmn:endEvent id="EndEvent_ChannelRejected" name="Канал отклонён">
-      <bpmn:incoming>Flow_Gateway_To_End</bpmn:incoming>
-    </bpmn:endEvent>
-
-    <bpmn:sequenceFlow id="Flow_Gateway_To_End" sourceRef="ExclusiveGateway_ChannelCheck" targetRef="EndEvent_ChannelRejected"/>
+    <bpmn:sequenceFlow id="Flow_Stream_To_BI" sourceRef="Task_PublishStream" targetRef="Task_UpdateAnalytics"/>
 
     <bpmn:endEvent id="EndEvent_OrderComplete" name="Заказ завершён">
-      <bpmn:incoming>Flow_Publish_To_End</bpmn:incoming>
       <bpmn:incoming>Flow_CRM_To_End</bpmn:incoming>
       <bpmn:incoming>Flow_BI_To_End</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:sequenceFlow id="Flow_Publish_To_End" sourceRef="Task_PublishEvents" targetRef="EndEvent_OrderComplete"/>
     <bpmn:sequenceFlow id="Flow_CRM_To_End" sourceRef="Task_SendCVC" targetRef="EndEvent_OrderComplete"/>
-    <bpmn:sequenceFlow id="Flow_BI_To_End" sourceRef="Task_ConsumeAudit" targetRef="EndEvent_OrderComplete"/>
+    <bpmn:sequenceFlow id="Flow_BI_To_End" sourceRef="Task_UpdateAnalytics" targetRef="EndEvent_OrderComplete"/>
   </bpmn:process>
 
   <bpmndi:BPMNDiagram id="BPMNDiagram_GiftCertificateLifecycle">
     <bpmndi:BPMNPlane id="BPMNPlane_GiftCertificateLifecycle" bpmnElement="Process_GiftCertificateLifecycle">
       <bpmndi:BPMNLane id="BPMNLane_InternetStore" bpmnElement="Lane_InternetStore">
-        <dc:Bounds x="0" y="0" width="400" height="120"/>
+        <dc:Bounds x="0" y="0" width="600" height="120"/>
       </bpmndi:BPMNLane>
       <bpmndi:BPMNLane id="BPMNLane_GCP" bpmnElement="Lane_GCP">
-        <dc:Bounds x="0" y="120" width="400" height="180"/>
+        <dc:Bounds x="0" y="120" width="600" height="160"/>
       </bpmndi:BPMNLane>
-      <bpmndi:BPMNLane id="BPMNLane_Payments" bpmnElement="Lane_Payments">
-        <dc:Bounds x="0" y="300" width="400" height="100"/>
+      <bpmndi:BPMNLane id="BPMNLane_Bus" bpmnElement="Lane_Bus">
+        <dc:Bounds x="0" y="280" width="600" height="100"/>
       </bpmndi:BPMNLane>
       <bpmndi:BPMNLane id="BPMNLane_CRM" bpmnElement="Lane_CRM">
-        <dc:Bounds x="0" y="400" width="400" height="100"/>
+        <dc:Bounds x="0" y="380" width="600" height="100"/>
       </bpmndi:BPMNLane>
       <bpmndi:BPMNLane id="BPMNLane_BI" bpmnElement="Lane_BI">
-        <dc:Bounds x="0" y="500" width="400" height="100"/>
+        <dc:Bounds x="0" y="480" width="600" height="100"/>
       </bpmndi:BPMNLane>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

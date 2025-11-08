@@ -4,78 +4,74 @@
 
 - **Что происходит:** Покупатель оформляет заказ на подарочный сертификат в интернет-магазине или POS.
 - **Последствия:**
-  - HTTP-запрос из канала (`Internet Store` или `POS`) в платёжный сервис `Payments` на авторизацию платежа.
-  - После успешной авторизации канал публикует команду `issueCertificate` в Kafka-топик `GiftCertificate.Commands`.
+  - Канал вызывает GCP Service `GET /certificates/next`, резервирует уникальный сертификат.
+  - Канал публикует событие заказа в `All_SalesOrder` и платеж в `All_Payments` (авторизация).
 
 ## 2. Выпуск (issue) сертификата
 
-- **Что происходит:** Сервис процессинга получает команду `issueCertificate`, генерирует сертификат, присваивает номер и CVC.
+- **Что происходит:** GCP Service получает события заказа и платежа, подтверждает выпуск сертификата.
 - **Последствия:**
-  - Внутренний HTTP-запрос в `Payments` на фиксацию платежа (capture) по авторизации.
-  - Публикация события в `GiftCertificates.State` с атрибутами `status=ISSUED`, `channel` и деталями сертификата.
-  - Публикация события в `GiftCertificate.Notifications` для CRM с инструкцией отправить CVC клиенту.
-  - Запись события аудита в `GiftCertificate.Audit`.
+  - Публикация события `GiftCertificates.Stream` с `eventType=issued`, включающего канал, сумму, срок действия.
+  - Публикация события `GiftCertificates.Stream` с `eventType=notification.requested` для CRM.
+  - Обновление внутреннего состояния и записи аудита (внутри того же события).
 
 ## 3. Отправка CVC покупателю
 
-- **Что происходит:** CRM получает событие из `GiftCertificate.Notifications` и отправляет CVC.
+- **Что происходит:** CRM получает триггер из `GiftCertificates.Stream` и отправляет CVC.
 - **Последствия:**
-  - Отправка email/SMS клиенту с данными сертификата.
-  - Обновление CRM-профиля клиента, добавление записи о коммуникации.
-  - При необходимости публикация обновлённого состояния клиента в `All_Clients`.
+  - CRM вызывает `GET /certificates/{id}/cvc` для получения одноразового кода.
+  - После успешной доставки CRM при необходимости обновляет профиль клиента и публикует событие `All_Clients`.
+  - GCP Service фиксирует результат доставкой в `GiftCertificates.Stream` (`eventType=notification.sent`/`notification.failed`).
 
-## 4. Частичное списание (redeemPartial)
+## 4. Частичное списание (redeem.partial)
 
-- **Что происходит:** Клиент оплачивает покупку, частично используя сертификат.
+- **Что происходит:** Клиент оплачивает покупку, частично используя сертификат и частично другой способ оплаты.
 - **Последствия:**
-  - Канал (POS или ИМ) отправляет команду `redeemPartial` в `GiftCertificate.Commands`.
-  - HTTP-запрос GCP Service в Orders для привязки заказа к сертификату.
-  - Запрос в Payments на доплату оставшейся суммы (если требуется).
-  - Публикация события в `GiftCertificates.State` с `status=PARTIALLY_REDEEMED`, указанием редукции баланса.
-  - Запись события аудита в `GiftCertificate.Audit`.
-  - Enriched событие заказа в `All_SalesOrder`.
+  - Канал публикует обновление заказа в `All_SalesOrder` с номером сертификата и суммой списания.
+  - Канал публикует событие доплаты/списания в `All_Payments`.
+  - GCP Service, сопоставив события, обновляет баланс сертификата и публикует `GiftCertificates.Stream` (`eventType=redeem.partial`, `remainingBalance`).
 
-## 5. Полное списание (redeemFull)
+## 5. Полное списание (redeem.full)
 
-- **Что происходит:** Сертификат полностью погашается при оплате.
+- **Что происходит:** Сертификат полностью погашается.
 - **Последствия:**
-  - Команда `redeemFull` в `GiftCertificate.Commands`.
-  - HTTP-запрос в Orders на фиксацию оплаты сертификатом.
-  - Публикация события в `GiftCertificates.State` с `status=REDEEMED`, `remainingBalance=0`.
-  - Аудит-событие в `GiftCertificate.Audit`.
-  - Обновление `All_SalesOrder` с указанием закрытого сертификата.
+  - Обновление `All_SalesOrder` и `All_Payments` с суммой, равной номиналу.
+  - GCP Service публикует `GiftCertificates.Stream` (`eventType=redeem.full`, `remainingBalance=0`).
+  - BI фиксирует факт полного погашения, CRM может инициировать пост-коммуникации.
 
-## 6. Возврат (refund) сертификата
+## 6. Возврат (refund)
 
 - **Что происходит:** Клиент запрашивает возврат средств по сертификату.
 - **Последствия:**
-  - Команда `refund` от канала в `GiftCertificate.Commands`.
-  - HTTP-запрос в Payments: если возможно, возврат на исходный платёжный метод.
-  - При отказе — генерация запроса на дополнительные реквизиты (обновление поля `pendingRefundDetails`).
-  - Публикация события `GiftCertificates.State` со статусом `REFUNDED` (или `REFUND_PENDING`).
-  - Запись в `GiftCertificate.Audit`.
-  - Публикация события в `All_Payments` об операции возврата.
+  - Канал инициирует возврат через `All_Payments` (refund) и отражает статус заказа в `All_SalesOrder`.
+  - GCP Service обновляет состояние сертификата (например, `status=REFUNDED` или `REFUND_PENDING`) и публикует событие `GiftCertificates.Stream` (`eventType=refund.initiated`/`refund.completed`).
+  - Если требуется уточнение реквизитов, в `GiftCertificates.Stream` публикуется событие `refund.pendingDetails`.
 
 ## 7. Блокировка сертификата (lock)
 
-- **Что происходит:** Служба поддержки вручную блокирует сертификат для проверки.
+- **Что происходит:** Служба поддержки блокирует сертификат для проверки.
 - **Последствия:**
-  - HTTP-вызов на эндпоинт `/certificates/{id}/actions/lock`.
-  - Обновление состояния в хранилище GCP Service, фиксация статуса `LOCKED`.
-  - Публикация события `GiftCertificates.State` с соответствующим статусом и причиной.
-  - Аудит-событие в `GiftCertificate.Audit`.
+  - HTTP-вызов `/certificates/{id}/actions/lock`.
+  - GCP Service публикует `GiftCertificates.Stream` (`eventType=lock.applied`) с причиной.
+  - Каналы и CRM получают уведомление и могут ограничить использование.
 
 ## 8. Разблокировка сертификата (unlock)
 
 - **Что происходит:** Завершена проверка, сертификат снова доступен.
 - **Последствия:**
   - HTTP-вызов `/certificates/{id}/actions/unlock` (FUTURE).
-  - Обновление статуса в хранилище и событие `GiftCertificates.State` с предыдущим бизнес-статусом.
-  - Аудит-запись о снятии блокировки.
+  - GCP Service публикует `GiftCertificates.Stream` (`eventType=lock.released`) и восстанавливает рабочий статус.
 
-## 9. Актуализация данных для BI
+## 9. Недостаток сертификатов (issue.blocked)
+
+- **Что происходит:** Пул предсозданных сертификатов исчерпан.
+- **Последствия:**
+  - Метод `GET /certificates/next` возвращает ошибку `409 CONFLICT`.
+  - В `GiftCertificates.Stream` публикуется событие `issue.blocked`, BI и операторы получают уведомление.
+
+## 10. Актуализация данных для BI
 
 - **Что происходит:** BI подписывается на события и формирует витрины.
 - **Последствия:**
-  - Потребление `GiftCertificates.State`, `GiftCertificate.Audit`, `All_SalesOrder`, `All_Payments`, `All_Clients`.
-  - Загрузка данных в витрины и отчёты, обновление агрегатов и метрик (осуществляется без дополнительных HTTP-вызовов).
+  - Потребление `GiftCertificates.Stream`, `All_SalesOrder`, `All_Payments`, `All_Clients`.
+  - Формирование отчётов без дополнительных HTTP-вызовов; сохранение исторических срезов.

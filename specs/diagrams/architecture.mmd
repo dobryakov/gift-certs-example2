@@ -13,28 +13,28 @@ flowchart LR
         CRM["CRM"]
     end
     BI["BI Platform"]
+    Customer["Customer"]
 
-    IM -- "produce\nGiftCertificate.Commands" --> GCP
-    POS -- "produce\nGiftCertificate.Commands" --> GCP
-    GCP -- "consume\nGiftCertificate.Commands" --> GCP
+    IM -- "HTTP\nGET /certificates/next" --> GCP
+    POS -- "HTTP\nGET /certificates/next" --> GCP
 
-    GCP -- "produce\nGiftCertificates.State" --> IM
-    GCP -- "produce\nGiftCertificates.State" --> POS
-    GCP -- "produce\nGiftCertificates.State" --> BI
+    IM -- "publish\nAll_SalesOrder" --> ORD
+    POS -- "publish\nAll_SalesOrder" --> ORD
+    ORD -- "forward\nAll_SalesOrder" --> GCP
+    ORD -- "forward\nAll_SalesOrder" --> BI
 
-    GCP -- "produce\nGiftCertificate.Notifications" --> CRM
-    CRM -- "send CVC\n(письмо/SMS)" --> IM
+    IM -- "publish\nAll_Payments" --> PAY
+    POS -- "publish\nAll_Payments" --> PAY
+    PAY -- "forward\nAll_Payments" --> GCP
+    PAY -- "forward\nAll_Payments" --> BI
 
-    GCP -- "produce\nGiftCertificate.Audit" --> BI
+    CRM -- "publish\nAll_Clients" --> GCP
+    CRM -- "publish\nAll_Clients" --> BI
 
-    ORD -- "produce\nAll_SalesOrder" --> GCP
-    PAY -- "produce\nAll_Payments" --> GCP
-    CRM -- "produce\nAll_Clients" --> GCP
+    GCP -- "publish\nGiftCertificates.Stream" --> IM
+    GCP -- "publish\nGiftCertificates.Stream" --> POS
+    GCP -- "publish\nGiftCertificates.Stream" --> CRM
+    GCP -- "publish\nGiftCertificates.Stream" --> BI
 
-    GCP -- "enrich orders\npublish All_SalesOrder" --> BI
-    GCP -- "enrich payments\npublish All_Payments" --> BI
-    GCP -- "publish\nGiftCertificates.State" --> BI
-
-    PAY <-- "refund command\nvia HTTP" --> GCP
-    ORD <-- "order linkage\nvia HTTP" --> GCP
-
+    CRM -- "HTTP\nGET /certificates/{id}/cvc" --> GCP
+    CRM -- "send CVC\n(письмо/SMS)" --> Customer

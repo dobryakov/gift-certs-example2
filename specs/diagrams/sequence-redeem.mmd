@@ -3,18 +3,17 @@ sequenceDiagram
     participant Customer
     participant POS
     participant GCP as Gift Certificate Processing
-    participant ORD as Orders
-    participant PAY as Payments
+    participant Orders as All_SalesOrder
+    participant Payments as All_Payments
     participant BI
 
     Customer->>POS: Покупка товара с сертификатом
-    POS->>GCP: Команда redeemPartial (GiftCertificate.Commands)
-    GCP->>GCP: Проверка канала, остатка, статуса
-    GCP->>ORD: HTTP запрос на связывание заказа и сертификата
-    ORD-->>GCP: Подтверждение
-    GCP->>PAY: HTTP запрос на доплату оставшейся суммы
-    PAY-->>GCP: Результат платежа
-    GCP->>POS: Событие GiftCertificates.State (channel=OFFLINE, redeemedPartial)
-    GCP->>BI: Событие GiftCertificate.Audit (redeem_partial)
-    GCP->>ORD: Публикация enriched заказа в All_SalesOrder
+    POS->>Orders: Событие заказа с позицией оплаты сертификатом
+    POS->>Payments: Событие платежа (partial capture)
+    Orders-->>GCP: Событие заказа
+    Payments-->>GCP: Событие платежа
+    GCP->>GCP: Пересчёт остатка сертификата
+    GCP-->>POS: Событие GiftCertificates.Stream {eventType=redeem.partial}
+    GCP-->>BI: Событие GiftCertificates.Stream {eventType=redeem.partial}
+    GCP-->>Orders: Enriched событие (через GiftCertificates.Stream, metadata link)
 

@@ -3,11 +3,52 @@ info:
   title: Сервис Процессинга Подарочных Сертификатов API
   version: 1.0.0
   description: >
-    HTTP API предоставляет вспомогательные операции чтения и диагностические команды,
-    дополняющие событийное взаимодействие через Kafka-топики `GiftCertificate.*`.
+    HTTP API предоставляет вспомогательные операции чтения, резервирования сертификатов и получения CVC.
+    Основная бизнес-логика синхронизируется через Kafka-топики (`All_SalesOrder`, `All_Payments`, `GiftCertificates.Stream`).
 servers:
   - url: https://gcp-service.internal/api/v1
 paths:
+  /certificates/next:
+    post:
+      summary: Резервирование следующего сертификата
+      description: >
+        Каналы (ИМ или POS) вызывают метод перед записью заказа. Сервис возвращает идентификатор и параметры
+        предсозданного сертификата. CVC не возвращается — для отправки применяется отдельный вызов.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: string
+                  enum:
+                    - ONLINE
+                    - OFFLINE
+                orderReference:
+                  type: string
+                  description: Внутренний идентификатор заказа/чека канала
+                requestedValue:
+                  type: number
+                  format: double
+                  description: Номинал сертификата
+              required:
+                - channel
+                - orderReference
+      responses:
+        '200':
+          description: Сертификат зарезервирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCertificateReservation'
+        '409':
+          description: Нет доступных сертификатов (issue.blocked)
+        '400':
+          description: Некорректные данные запроса
+        '500':
+          description: Внутренняя ошибка сервиса
   /certificates/{certificateId}:
     get:
       summary: Получить состояние сертификата
@@ -115,6 +156,41 @@ paths:
           description: Некорректные параметры фильтрации
         '500':
           description: Внутренняя ошибка сервиса
+  /certificates/{certificateId}/cvc:
+    get:
+      summary: Получить CVC сертификата
+      description: >
+        CRM вызывает метод после события `notification.requested` для формирования письма/SMS.
+        Ответ содержит одноразовый CVC; повторное чтение может быть запрещено в зависимости от политики безопасности.
+      parameters:
+        - name: certificateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CVC выдан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificateId:
+                    type: string
+                  cvc:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: Сертификат не найден
+        '423':
+          description: Сертификат заблокирован или CVC недоступен
+        '410':
+          description: CVC уже выдан и недоступен повторно
+        '500':
+          description: Внутренняя ошибка сервиса
   /certificates/{certificateId}/actions/lock:
     post:
       summary: Заблокировать сертификат для ручной проверки
@@ -158,6 +234,29 @@ paths:
           description: Внутренняя ошибка сервиса
 components:
   schemas:
+    GiftCertificateReservation:
+      type: object
+      properties:
+        certificateId:
+          type: string
+        serialNumber:
+          type: string
+        channel:
+          type: string
+        faceValue:
+          type: number
+          format: double
+        currency:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        cvcToken:
+          type: string
+          description: Одноразовый идентификатор для последующего получения CVC (который CRM использует позже)
+        reservationExpiresAt:
+          type: string
+          format: date-time
     GiftCertificateSummary:
       type: object
       properties:
