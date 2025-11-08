@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_RedeemVoid" targetNamespace="http://example.com/bpmn/giftcerts">
+  <bpmn:process id="Process_RedeemVoid" name="Gift Certificate Redemption and Void" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_RedeemVoid">
+      <bpmn:lane id="Lane_OnlineStore" name="OnlineStore">
+        <bpmn:flowNodeRef>StartEvent_RedeemRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CaptureWebRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DisplayBalance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestAuthorizationOnline</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NotifyFailure</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ShowWebConfirmation</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_POS" name="POS">
+        <bpmn:flowNodeRef>Task_ScanPOSCode</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestAuthorizationPOS</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PrintPOSReceipt</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Payments" name="Payments">
+        <bpmn:flowNodeRef>Task_CapturePayment</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_GiftProcessing" name="GiftCertificateProcessing">
+        <bpmn:flowNodeRef>Gateway_ChannelDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChannelMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AuthorizeBalance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_AuthorizationResult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ConfirmCapture</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChannelResult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PublishTransaction</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReleaseHold</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_BIPipeline" name="BI Pipeline">
+        <bpmn:flowNodeRef>Task_StreamToBI</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Settled</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Cancelled</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_RedeemRequest" name="Redeem Request"/>
+    <bpmn:task id="Task_CaptureWebRequest" name="Capture Channel Request"/>
+    <bpmn:exclusiveGateway id="Gateway_ChannelDecision" name="Channel?" default="Flow_OnlineBranch"/>
+    <bpmn:task id="Task_DisplayBalance" name="Display Balance"/>
+    <bpmn:task id="Task_RequestAuthorizationOnline" name="Submit Authorization (Online)"/>
+    <bpmn:task id="Task_ScanPOSCode" name="Scan Certificate"/>
+    <bpmn:task id="Task_RequestAuthorizationPOS" name="Submit Authorization (POS)"/>
+    <bpmn:exclusiveGateway id="Gateway_ChannelMerge" name="Merge Channel"/>
+    <bpmn:task id="Task_AuthorizeBalance" name="Authorize Balance"/>
+    <bpmn:exclusiveGateway id="Gateway_AuthorizationResult" name="Authorized?"/>
+    <bpmn:task id="Task_CapturePayment" name="Capture Payment"/>
+    <bpmn:task id="Task_ConfirmCapture" name="Confirm Capture"/>
+    <bpmn:exclusiveGateway id="Gateway_ChannelResult" name="Channel Confirmation" default="Flow_WebConfirm"/>
+    <bpmn:task id="Task_ShowWebConfirmation" name="Show Web Confirmation"/>
+    <bpmn:task id="Task_PrintPOSReceipt" name="Print POS Receipt"/>
+    <bpmn:task id="Task_PublishTransaction" name="Publish GiftCertificateTransaction"/>
+    <bpmn:task id="Task_StreamToBI" name="Stream to GiftCertificateBI"/>
+    <bpmn:endEvent id="EndEvent_Settled" name="Redemption Settled"/>
+    <bpmn:task id="Task_NotifyFailure" name="Notify Failure"/>
+    <bpmn:task id="Task_ReleaseHold" name="Release Authorization Hold"/>
+    <bpmn:endEvent id="EndEvent_Cancelled" name="Redemption Cancelled"/>
+    <bpmn:sequenceFlow id="Flow_Start" sourceRef="StartEvent_RedeemRequest" targetRef="Task_CaptureWebRequest"/>
+    <bpmn:sequenceFlow id="Flow_ToDecision" sourceRef="Task_CaptureWebRequest" targetRef="Gateway_ChannelDecision"/>
+    <bpmn:sequenceFlow id="Flow_OnlineBranch" sourceRef="Gateway_ChannelDecision" targetRef="Task_DisplayBalance" name="Online"/>
+    <bpmn:sequenceFlow id="Flow_POSBranch" sourceRef="Gateway_ChannelDecision" targetRef="Task_ScanPOSCode" name="POS"/>
+    <bpmn:sequenceFlow id="Flow_DisplayToAuth" sourceRef="Task_DisplayBalance" targetRef="Task_RequestAuthorizationOnline"/>
+    <bpmn:sequenceFlow id="Flow_POSScanToAuth" sourceRef="Task_ScanPOSCode" targetRef="Task_RequestAuthorizationPOS"/>
+    <bpmn:sequenceFlow id="Flow_OnlineToMerge" sourceRef="Task_RequestAuthorizationOnline" targetRef="Gateway_ChannelMerge"/>
+    <bpmn:sequenceFlow id="Flow_POSToMerge" sourceRef="Task_RequestAuthorizationPOS" targetRef="Gateway_ChannelMerge"/>
+    <bpmn:sequenceFlow id="Flow_MergeToAuthorize" sourceRef="Gateway_ChannelMerge" targetRef="Task_AuthorizeBalance"/>
+    <bpmn:sequenceFlow id="Flow_AuthorizeToResult" sourceRef="Task_AuthorizeBalance" targetRef="Gateway_AuthorizationResult"/>
+    <bpmn:sequenceFlow id="Flow_Authorized" sourceRef="Gateway_AuthorizationResult" targetRef="Task_CapturePayment" name="Approved"/>
+    <bpmn:sequenceFlow id="Flow_Denied" sourceRef="Gateway_AuthorizationResult" targetRef="Task_NotifyFailure" name="Declined"/>
+    <bpmn:sequenceFlow id="Flow_CaptureToConfirm" sourceRef="Task_CapturePayment" targetRef="Task_ConfirmCapture"/>
+    <bpmn:sequenceFlow id="Flow_ConfirmToChannel" sourceRef="Task_ConfirmCapture" targetRef="Gateway_ChannelResult"/>
+    <bpmn:sequenceFlow id="Flow_WebConfirm" sourceRef="Gateway_ChannelResult" targetRef="Task_ShowWebConfirmation" name="Online"/>
+    <bpmn:sequenceFlow id="Flow_POSConfirm" sourceRef="Gateway_ChannelResult" targetRef="Task_PrintPOSReceipt" name="POS"/>
+    <bpmn:sequenceFlow id="Flow_WebToPublish" sourceRef="Task_ShowWebConfirmation" targetRef="Task_PublishTransaction"/>
+    <bpmn:sequenceFlow id="Flow_POSToPublish" sourceRef="Task_PrintPOSReceipt" targetRef="Task_PublishTransaction"/>
+    <bpmn:sequenceFlow id="Flow_PublishToBI" sourceRef="Task_PublishTransaction" targetRef="Task_StreamToBI"/>
+    <bpmn:sequenceFlow id="Flow_BIToEnd" sourceRef="Task_StreamToBI" targetRef="EndEvent_Settled"/>
+    <bpmn:sequenceFlow id="Flow_NotifyToRelease" sourceRef="Task_NotifyFailure" targetRef="Task_ReleaseHold"/>
+    <bpmn:sequenceFlow id="Flow_ReleaseToEnd" sourceRef="Task_ReleaseHold" targetRef="EndEvent_Cancelled"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_RedeemVoid">
+    <bpmndi:BPMNPlane id="BPMNPlane_RedeemVoid" bpmnElement="Process_RedeemVoid">
+      <bpmndi:BPMNShape id="LaneShape_OnlineStore" bpmnElement="Lane_OnlineStore">
+        <dc:Bounds x="120" y="60" width="2500" height="120"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_POS" bpmnElement="Lane_POS">
+        <dc:Bounds x="120" y="180" width="2500" height="120"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_Payments" bpmnElement="Lane_Payments">
+        <dc:Bounds x="120" y="300" width="2500" height="120"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_GiftProcessing" bpmnElement="Lane_GiftProcessing">
+        <dc:Bounds x="120" y="420" width="2500" height="200"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_BIPipeline" bpmnElement="Lane_BIPipeline">
+        <dc:Bounds x="120" y="620" width="2500" height="120"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_StartEvent_RedeemRequest" bpmnElement="StartEvent_RedeemRequest">
+        <dc:Bounds x="160" y="112" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_CaptureWebRequest" bpmnElement="Task_CaptureWebRequest">
+        <dc:Bounds x="220" y="100" width="170" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Gateway_ChannelDecision" bpmnElement="Gateway_ChannelDecision" isMarkerVisible="true">
+        <dc:Bounds x="420" y="112" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_DisplayBalance" bpmnElement="Task_DisplayBalance">
+        <dc:Bounds x="520" y="100" width="160" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_RequestAuthorizationOnline" bpmnElement="Task_RequestAuthorizationOnline">
+        <dc:Bounds x="700" y="100" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_ScanPOSCode" bpmnElement="Task_ScanPOSCode">
+        <dc:Bounds x="520" y="220" width="160" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_RequestAuthorizationPOS" bpmnElement="Task_RequestAuthorizationPOS">
+        <dc:Bounds x="700" y="220" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Gateway_ChannelMerge" bpmnElement="Gateway_ChannelMerge" isMarkerVisible="true">
+        <dc:Bounds x="930" y="332" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_AuthorizeBalance" bpmnElement="Task_AuthorizeBalance">
+        <dc:Bounds x="1020" y="440" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Gateway_AuthorizationResult" bpmnElement="Gateway_AuthorizationResult" isMarkerVisible="true">
+        <dc:Bounds x="1250" y="452" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_CapturePayment" bpmnElement="Task_CapturePayment">
+        <dc:Bounds x="1350" y="332" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_ConfirmCapture" bpmnElement="Task_ConfirmCapture">
+        <dc:Bounds x="1580" y="440" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Gateway_ChannelResult" bpmnElement="Gateway_ChannelResult" isMarkerVisible="true">
+        <dc:Bounds x="1830" y="452" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_ShowWebConfirmation" bpmnElement="Task_ShowWebConfirmation">
+        <dc:Bounds x="1930" y="100" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_PrintPOSReceipt" bpmnElement="Task_PrintPOSReceipt">
+        <dc:Bounds x="1930" y="220" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_PublishTransaction" bpmnElement="Task_PublishTransaction">
+        <dc:Bounds x="2090" y="440" width="210" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_StreamToBI" bpmnElement="Task_StreamToBI">
+        <dc:Bounds x="2330" y="640" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent_Settled" bpmnElement="EndEvent_Settled">
+        <dc:Bounds x="2550" y="662" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_NotifyFailure" bpmnElement="Task_NotifyFailure">
+        <dc:Bounds x="1350" y="100" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_ReleaseHold" bpmnElement="Task_ReleaseHold">
+        <dc:Bounds x="1700" y="520" width="200" height="60"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent_Cancelled" bpmnElement="EndEvent_Cancelled">
+        <dc:Bounds x="1950" y="662" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_di" bpmnElement="Flow_Start">
+        <di:waypoint x="196" y="130"/>
+        <di:waypoint x="220" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToDecision_di" bpmnElement="Flow_ToDecision">
+        <di:waypoint x="390" y="130"/>
+        <di:waypoint x="420" y="137"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_OnlineBranch_di" bpmnElement="Flow_OnlineBranch">
+        <di:waypoint x="470" y="137"/>
+        <di:waypoint x="520" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_POSBranch_di" bpmnElement="Flow_POSBranch">
+        <di:waypoint x="445" y="162"/>
+        <di:waypoint x="520" y="250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DisplayToAuth_di" bpmnElement="Flow_DisplayToAuth">
+        <di:waypoint x="680" y="130"/>
+        <di:waypoint x="700" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_POSScanToAuth_di" bpmnElement="Flow_POSScanToAuth">
+        <di:waypoint x="680" y="250"/>
+        <di:waypoint x="700" y="250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_OnlineToMerge_di" bpmnElement="Flow_OnlineToMerge">
+        <di:waypoint x="900" y="130"/>
+        <di:waypoint x="930" y="357"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_POSToMerge_di" bpmnElement="Flow_POSToMerge">
+        <di:waypoint x="900" y="250"/>
+        <di:waypoint x="930" y="357"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_MergeToAuthorize_di" bpmnElement="Flow_MergeToAuthorize">
+        <di:waypoint x="980" y="357"/>
+        <di:waypoint x="1020" y="470"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AuthorizeToResult_di" bpmnElement="Flow_AuthorizeToResult">
+        <di:waypoint x="1220" y="470"/>
+        <di:waypoint x="1250" y="477"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Authorized_di" bpmnElement="Flow_Authorized">
+        <di:waypoint x="1300" y="477"/>
+        <di:waypoint x="1350" y="362"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Denied_di" bpmnElement="Flow_Denied">
+        <di:waypoint x="1275" y="502"/>
+        <di:waypoint x="1350" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CaptureToConfirm_di" bpmnElement="Flow_CaptureToConfirm">
+        <di:waypoint x="1550" y="362"/>
+        <di:waypoint x="1580" y="470"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ConfirmToChannel_di" bpmnElement="Flow_ConfirmToChannel">
+        <di:waypoint x="1780" y="470"/>
+        <di:waypoint x="1830" y="477"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WebConfirm_di" bpmnElement="Flow_WebConfirm">
+        <di:waypoint x="1880" y="477"/>
+        <di:waypoint x="1930" y="130"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_POSConfirm_di" bpmnElement="Flow_POSConfirm">
+        <di:waypoint x="1855" y="502"/>
+        <di:waypoint x="1930" y="250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WebToPublish_di" bpmnElement="Flow_WebToPublish">
+        <di:waypoint x="2130" y="130"/>
+        <di:waypoint x="2090" y="470"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_POSToPublish_di" bpmnElement="Flow_POSToPublish">
+        <di:waypoint x="2130" y="250"/>
+        <di:waypoint x="2090" y="470"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PublishToBI_di" bpmnElement="Flow_PublishToBI">
+        <di:waypoint x="2300" y="470"/>
+        <di:waypoint x="2330" y="670"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_BIToEnd_di" bpmnElement="Flow_BIToEnd">
+        <di:waypoint x="2530" y="670"/>
+        <di:waypoint x="2550" y="680"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyToRelease_di" bpmnElement="Flow_NotifyToRelease">
+        <di:waypoint x="1550" y="130"/>
+        <di:waypoint x="1700" y="550"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseToEnd_di" bpmnElement="Flow_ReleaseToEnd">
+        <di:waypoint x="1900" y="550"/>
+        <di:waypoint x="1950" y="680"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
