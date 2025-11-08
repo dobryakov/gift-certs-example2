@@ -8,9 +8,10 @@
 
 ## Процесс активации при продаже
 
-- Сервис `GiftCertificateProcessing` сопоставляет события `All_SalesOrder` и `All_Payments`.
+- `Orders` публикует `All_SalesOrder` с массивом `certificateLines`, `GiftCertificateProcessing` фиксирует каждый `orderLineId` в `order_certificate_allocation`.
 - Перед авторизацией выполняется проверка уникальности кода: если сертификат уже реализован, фронт получает ошибку `CodeAlreadySold`.
-- После подтверждения оплаты активирует сертификат, инициирует отправку SMS, обновляет состояние и публикует события.
+- `Payments` публикует `All_Payments` с секцией `certificateAllocations`, сервис распределяет поступившие суммы и отслеживает статус `allocation_status`.
+- После события с `isOrderSettled=true` и `outstandingAmount=0` активируются все сертификаты заказа, инициируется отправка SMS, обновляется состояние и публикуются события.
 
 ## Процесс оплаты сертификатом
 

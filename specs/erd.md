@@ -63,12 +63,23 @@
   - `payload_after`
   - `created_at`
 
+- `order_certificate_allocation`
+  - `order_line_id` (UUID, PK)
+  - `order_id` (UUID)
+  - `certificate_id` (FK -> gift_certificate)
+  - `planned_amount`
+  - `collected_amount`
+  - `currency`
+  - `allocation_status` (Planned/PartiallyFunded/FullyFunded)
+  - `last_payment_event_id`
+
 ## Особенности моделирования
 
 - Все денежные значения хранятся в минимальной денежной единице (копейки) и пересчитываются в API.
 - История операций хранится в `gift_certificate_operation` и связывается с аудитом для обогащения событий.
 - Таблица `authorization_hold` обеспечивает идемпотентность и контроль срока действия резервов.
 - Уникальность продажи обеспечивается ограничением `gift_certificate.code` + `status in (Sold, Active, Redeemed, Cancelled)` и `unique_sale_token`, который фиксирует канал и оператора продажи.
+- `order_certificate_allocation` фиксирует пожелания покупателя по суммам, накапливает поступившие платежи и служит триггером для активации после полной оплаты заказа.
 
 ## Связи
 

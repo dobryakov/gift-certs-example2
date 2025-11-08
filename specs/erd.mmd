@@ -1,6 +1,7 @@
 erDiagram
   GIFT_CERTIFICATE ||--o{ GIFT_CERTIFICATE_OPERATION : "has"
   GIFT_CERTIFICATE ||--o{ AUTHORIZATION_HOLD : "reserves"
+  GIFT_CERTIFICATE ||--o{ ORDER_CERTIFICATE_ALLOCATION : "plannedFor"
   GIFT_CERTIFICATE_OPERATION }o--|| AUDIT_LOG : "recorded"
 
   GIFT_CERTIFICATE {
@@ -46,6 +47,17 @@ erDiagram
     string channel
     datetime expires_at
     string status
+  }
+
+  ORDER_CERTIFICATE_ALLOCATION {
+    uuid order_line_id PK
+    string order_id
+    uuid certificate_id FK
+    decimal planned_amount
+    decimal collected_amount
+    string currency
+    string allocation_status
+    string last_payment_event_id
   }
 
   AUDIT_LOG {

@@ -391,6 +391,8 @@ components:
           type: object
           additionalProperties:
             type: string
+        allocation:
+          $ref: '#/components/schemas/CertificateAllocation'
     GiftCertificateOperation:
       type: object
       properties:
@@ -423,6 +425,9 @@ components:
         paymentId:
           type: string
           nullable: true
+        orderLineId:
+          type: string
+          nullable: true
         balanceAfter:
           type: number
           format: double
@@ -436,6 +441,29 @@ components:
               type: string
             notes:
               type: string
+    CertificateAllocation:
+      type: object
+      properties:
+        orderLineId:
+          type: string
+        orderId:
+          type: string
+        plannedAmount:
+          type: number
+          format: double
+        collectedAmount:
+          type: number
+          format: double
+        currency:
+          type: string
+        allocationStatus:
+          type: string
+          enum:
+            - Planned
+            - PartiallyFunded
+            - FullyFunded
+        lastPaymentEventId:
+          type: string
     ErrorResponse:
       type: object
       properties:

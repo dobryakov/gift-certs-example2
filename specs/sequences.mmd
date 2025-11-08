@@ -7,21 +7,22 @@ sequenceDiagram
   participant SMS as SMS Gateway
   participant BI as BI Pipeline
 
-  OS->>ORD: Создание заказа (Gift Certificate)
-  ORD-->>GC: Event All_SalesOrder
+  OS->>OS: Клиент распределяет суммы по сертификатам
+  OS->>ORD: Создание заказа (Gift Certificate + allocations)
+  ORD-->>GC: Event All_SalesOrder(certificateLines)
   OS->>GC: POST /certificates/{code}/authorize
   alt Код уже продан
     GC-->>OS: 409 CodeAlreadySold
   else Код свободен
-    GC->>GC: Резервировать код за каналом
+    GC->>GC: Резервировать код и создать order_certificate_allocation
     GC-->>OS: AuthorizationId, резерв подтверждён
     loop Частичные оплаты
       OS->>PAY: Подтвердить оплату
-      PAY-->>GC: Event All_Payments (version N, outstandingAmount > 0)
-      GC->>GC: Обновить агрегированные суммы
+      PAY-->>GC: Event All_Payments (certificateAllocations, version N, outstandingAmount > 0)
+      GC->>GC: Обновить collected_amount по order_line_id
     end
     PAY-->>GC: Event All_Payments (isOrderSettled=true, outstandingAmount = 0)
-    GC->>GC: Изменить статус сертификата на Active
+    GC->>GC: Активировать сертификаты заказа
     GC-->>SMS: Отправить CVC по SMS
     GC-->>BI: Publish GiftCertificateTransaction(Activate)
     GC-->>Kafka: Publish GiftCertificateState
