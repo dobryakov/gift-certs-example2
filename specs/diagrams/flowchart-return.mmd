@@ -12,7 +12,7 @@ flowchart TD
     I --> F
     F --> G[Опубликовать обновление заказа в All_SalesOrder]
     G --> J[Сервис процессинга фиксирует refund]
-    J --> K[Публикация GiftCertificates.Stream (статус REFUND_PENDING/REFUNDED)]
-    K --> L[BI и CRM обрабатывают новое состояние]
+    J --> K["Публикация GiftCertificates.Stream\nстатус REFUND_PENDING/REFUNDED"]
+    K --> L["BI и CRM обрабатывают новое состояние"]
     L --> M[End]
 

@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
-                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-                  id="Definitions_GiftCertificateLifecycle"
-                  targetNamespace="http://company.example/gift-certificates">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_GiftCertificateLifecycle" targetNamespace="http://company.example/gift-certificates">
   <bpmn:process id="Process_GiftCertificateLifecycle" isExecutable="false">
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_InternetStore" name="Internet Store">
@@ -19,7 +14,7 @@
         <bpmn:flowNodeRef>Task_CorrelateEvents</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_PublishStream</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Bus" name="Orders &amp; Payments">
+      <bpmn:lane id="Lane_Bus" name="Orders &#38; Payments">
         <bpmn:flowNodeRef>Task_RouteOrderEvent</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_RoutePaymentEvent</bpmn:flowNodeRef>
       </bpmn:lane>
@@ -32,137 +27,204 @@
         <bpmn:flowNodeRef>EndEvent_OrderComplete</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
-
     <bpmn:startEvent id="StartEvent_OrderRequested" name="Запрос на оформление">
       <bpmn:outgoing>Flow_Start_To_RequestNext</bpmn:outgoing>
     </bpmn:startEvent>
-
     <bpmn:task id="Task_RequestNextCert" name="GET /certificates/next">
       <bpmn:incoming>Flow_Start_To_RequestNext</bpmn:incoming>
       <bpmn:outgoing>Flow_RequestNext_To_Reserve</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Start_To_RequestNext" sourceRef="StartEvent_OrderRequested" targetRef="Task_RequestNextCert"/>
-
+    <bpmn:sequenceFlow id="Flow_Start_To_RequestNext" sourceRef="StartEvent_OrderRequested" targetRef="Task_RequestNextCert" />
     <bpmn:task id="Task_ReserveCertificate" name="Зарезервировать сертификат из пула">
       <bpmn:incoming>Flow_RequestNext_To_Reserve</bpmn:incoming>
       <bpmn:outgoing>Flow_Reserve_To_Gateway</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_RequestNext_To_Reserve" sourceRef="Task_RequestNextCert" targetRef="Task_ReserveCertificate"/>
-
+    <bpmn:sequenceFlow id="Flow_RequestNext_To_Reserve" sourceRef="Task_RequestNextCert" targetRef="Task_ReserveCertificate" />
     <bpmn:exclusiveGateway id="Gateway_PoolAvailable" name="Сертификат доступен?">
       <bpmn:incoming>Flow_Reserve_To_Gateway</bpmn:incoming>
       <bpmn:outgoing>Flow_Gateway_To_Order</bpmn:outgoing>
       <bpmn:outgoing>Flow_Gateway_To_Block</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-
-    <bpmn:sequenceFlow id="Flow_Reserve_To_Gateway" sourceRef="Task_ReserveCertificate" targetRef="Gateway_PoolAvailable"/>
-
+    <bpmn:sequenceFlow id="Flow_Reserve_To_Gateway" sourceRef="Task_ReserveCertificate" targetRef="Gateway_PoolAvailable" />
     <bpmn:intermediateThrowEvent id="IntermediateEvent_BlockIssue" name="GiftCertificates.Stream: issue.blocked">
       <bpmn:incoming>Flow_Gateway_To_Block</bpmn:incoming>
       <bpmn:outgoing>Flow_Block_To_End</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
-
-    <bpmn:sequenceFlow id="Flow_Gateway_To_Block" sourceRef="Gateway_PoolAvailable" targetRef="IntermediateEvent_BlockIssue"/>
-
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Block" sourceRef="Gateway_PoolAvailable" targetRef="IntermediateEvent_BlockIssue" />
     <bpmn:endEvent id="EndEvent_PoolEmpty" name="Запас исчерпан">
       <bpmn:incoming>Flow_Block_To_End</bpmn:incoming>
     </bpmn:endEvent>
-
-    <bpmn:sequenceFlow id="Flow_Block_To_End" sourceRef="IntermediateEvent_BlockIssue" targetRef="EndEvent_PoolEmpty"/>
-
+    <bpmn:sequenceFlow id="Flow_Block_To_End" sourceRef="IntermediateEvent_BlockIssue" targetRef="EndEvent_PoolEmpty" />
     <bpmn:task id="Task_PublishOrder" name="Публикация заказа в All_SalesOrder">
       <bpmn:incoming>Flow_Gateway_To_Order</bpmn:incoming>
       <bpmn:outgoing>Flow_Order_To_Bus</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Gateway_To_Order" sourceRef="Gateway_PoolAvailable" targetRef="Task_PublishOrder"/>
-
-    <bpmn:sequenceFlow id="Flow_Order_To_Bus" sourceRef="Task_PublishOrder" targetRef="Task_RouteOrderEvent"/>
-
+    <bpmn:sequenceFlow id="Flow_Gateway_To_Order" sourceRef="Gateway_PoolAvailable" targetRef="Task_PublishOrder" />
+    <bpmn:sequenceFlow id="Flow_Order_To_Bus" sourceRef="Task_PublishOrder" targetRef="Task_RouteOrderEvent" />
     <bpmn:task id="Task_PublishPayment" name="Публикация платежа в All_Payments">
       <bpmn:incoming>Flow_Bus_To_PublishPayment</bpmn:incoming>
       <bpmn:outgoing>Flow_PublishPayment_To_Bus</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Bus_To_PublishPayment" sourceRef="Task_RouteOrderEvent" targetRef="Task_PublishPayment"/>
-
-    <bpmn:sequenceFlow id="Flow_PublishPayment_To_Bus" sourceRef="Task_PublishPayment" targetRef="Task_RoutePaymentEvent"/>
-
+    <bpmn:sequenceFlow id="Flow_Bus_To_PublishPayment" sourceRef="Task_RouteOrderEvent" targetRef="Task_PublishPayment" />
+    <bpmn:sequenceFlow id="Flow_PublishPayment_To_Bus" sourceRef="Task_PublishPayment" targetRef="Task_RoutePaymentEvent" />
     <bpmn:task id="Task_RouteOrderEvent" name="Orders: маршрутизация события">
       <bpmn:incoming>Flow_Order_To_Bus</bpmn:incoming>
       <bpmn:outgoing>Flow_Bus_To_PublishPayment</bpmn:outgoing>
     </bpmn:task>
-
     <bpmn:task id="Task_RoutePaymentEvent" name="Payments: маршрутизация события">
       <bpmn:incoming>Flow_PublishPayment_To_Bus</bpmn:incoming>
       <bpmn:outgoing>Flow_Payment_To_Correlate</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Payment_To_Correlate" sourceRef="Task_RoutePaymentEvent" targetRef="Task_CorrelateEvents"/>
-
+    <bpmn:sequenceFlow id="Flow_Payment_To_Correlate" sourceRef="Task_RoutePaymentEvent" targetRef="Task_CorrelateEvents" />
     <bpmn:task id="Task_CorrelateEvents" name="Корреляция заказа и платежа">
       <bpmn:incoming>Flow_Payment_To_Correlate</bpmn:incoming>
       <bpmn:outgoing>Flow_Correlate_To_Stream</bpmn:outgoing>
     </bpmn:task>
-
     <bpmn:task id="Task_PublishStream" name="GiftCertificates.Stream: issue + notification.requested">
       <bpmn:incoming>Flow_Correlate_To_Stream</bpmn:incoming>
       <bpmn:outgoing>Flow_Stream_To_CRM</bpmn:outgoing>
       <bpmn:outgoing>Flow_Stream_To_BI</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Correlate_To_Stream" sourceRef="Task_CorrelateEvents" targetRef="Task_PublishStream"/>
-
+    <bpmn:sequenceFlow id="Flow_Correlate_To_Stream" sourceRef="Task_CorrelateEvents" targetRef="Task_PublishStream" />
     <bpmn:task id="Task_RequestCVC" name="GET /certificates/{id}/cvc">
       <bpmn:incoming>Flow_Stream_To_CRM</bpmn:incoming>
       <bpmn:outgoing>Flow_CRM_To_Send</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Stream_To_CRM" sourceRef="Task_PublishStream" targetRef="Task_RequestCVC"/>
-
+    <bpmn:sequenceFlow id="Flow_Stream_To_CRM" sourceRef="Task_PublishStream" targetRef="Task_RequestCVC" />
     <bpmn:task id="Task_SendCVC" name="Отправить CVC клиенту">
       <bpmn:incoming>Flow_CRM_To_Send</bpmn:incoming>
       <bpmn:outgoing>Flow_CRM_To_End</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_CRM_To_Send" sourceRef="Task_RequestCVC" targetRef="Task_SendCVC"/>
-
+    <bpmn:sequenceFlow id="Flow_CRM_To_Send" sourceRef="Task_RequestCVC" targetRef="Task_SendCVC" />
     <bpmn:task id="Task_UpdateAnalytics" name="Обновить витрины (BI)">
       <bpmn:incoming>Flow_Stream_To_BI</bpmn:incoming>
       <bpmn:outgoing>Flow_BI_To_End</bpmn:outgoing>
     </bpmn:task>
-
-    <bpmn:sequenceFlow id="Flow_Stream_To_BI" sourceRef="Task_PublishStream" targetRef="Task_UpdateAnalytics"/>
-
+    <bpmn:sequenceFlow id="Flow_Stream_To_BI" sourceRef="Task_PublishStream" targetRef="Task_UpdateAnalytics" />
     <bpmn:endEvent id="EndEvent_OrderComplete" name="Заказ завершён">
       <bpmn:incoming>Flow_CRM_To_End</bpmn:incoming>
       <bpmn:incoming>Flow_BI_To_End</bpmn:incoming>
     </bpmn:endEvent>
-
-    <bpmn:sequenceFlow id="Flow_CRM_To_End" sourceRef="Task_SendCVC" targetRef="EndEvent_OrderComplete"/>
-    <bpmn:sequenceFlow id="Flow_BI_To_End" sourceRef="Task_UpdateAnalytics" targetRef="EndEvent_OrderComplete"/>
+    <bpmn:sequenceFlow id="Flow_CRM_To_End" sourceRef="Task_SendCVC" targetRef="EndEvent_OrderComplete" />
+    <bpmn:sequenceFlow id="Flow_BI_To_End" sourceRef="Task_UpdateAnalytics" targetRef="EndEvent_OrderComplete" />
   </bpmn:process>
-
-  <bpmndi:BPMNDiagram id="BPMNDiagram_GiftCertificateLifecycle">
-    <bpmndi:BPMNPlane id="BPMNPlane_GiftCertificateLifecycle" bpmnElement="Process_GiftCertificateLifecycle">
-      <bpmndi:BPMNLane id="BPMNLane_InternetStore" bpmnElement="Lane_InternetStore">
-        <dc:Bounds x="0" y="0" width="600" height="120"/>
-      </bpmndi:BPMNLane>
-      <bpmndi:BPMNLane id="BPMNLane_GCP" bpmnElement="Lane_GCP">
-        <dc:Bounds x="0" y="120" width="600" height="160"/>
-      </bpmndi:BPMNLane>
-      <bpmndi:BPMNLane id="BPMNLane_Bus" bpmnElement="Lane_Bus">
-        <dc:Bounds x="0" y="280" width="600" height="100"/>
-      </bpmndi:BPMNLane>
-      <bpmndi:BPMNLane id="BPMNLane_CRM" bpmnElement="Lane_CRM">
-        <dc:Bounds x="0" y="380" width="600" height="100"/>
-      </bpmndi:BPMNLane>
-      <bpmndi:BPMNLane id="BPMNLane_BI" bpmnElement="Lane_BI">
-        <dc:Bounds x="0" y="480" width="600" height="100"/>
-      </bpmndi:BPMNLane>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Process_GiftCertificateLifecycle">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_GiftCertificateLifecycle" bpmnElement="Process_GiftCertificateLifecycle">
+      <bpmndi:BPMNShape id="StartEvent_OrderRequested_di" bpmnElement="StartEvent_OrderRequested">
+        <dc:Bounds x="57" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RequestNextCert_di" bpmnElement="Task_RequestNextCert">
+        <dc:Bounds x="175" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReserveCertificate_di" bpmnElement="Task_ReserveCertificate">
+        <dc:Bounds x="325" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PoolAvailable_di" bpmnElement="Gateway_PoolAvailable" isMarkerVisible="true">
+        <dc:Bounds x="500" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PublishOrder_di" bpmnElement="Task_PublishOrder">
+        <dc:Bounds x="625" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RouteOrderEvent_di" bpmnElement="Task_RouteOrderEvent">
+        <dc:Bounds x="775" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PublishPayment_di" bpmnElement="Task_PublishPayment">
+        <dc:Bounds x="925" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RoutePaymentEvent_di" bpmnElement="Task_RoutePaymentEvent">
+        <dc:Bounds x="1075" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CorrelateEvents_di" bpmnElement="Task_CorrelateEvents">
+        <dc:Bounds x="1225" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PublishStream_di" bpmnElement="Task_PublishStream">
+        <dc:Bounds x="1375" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RequestCVC_di" bpmnElement="Task_RequestCVC">
+        <dc:Bounds x="1525" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendCVC_di" bpmnElement="Task_SendCVC">
+        <dc:Bounds x="1675" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_OrderComplete_di" bpmnElement="EndEvent_OrderComplete">
+        <dc:Bounds x="1857" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IntermediateEvent_BlockIssue_di" bpmnElement="IntermediateEvent_BlockIssue">
+        <dc:Bounds x="657" y="192" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PoolEmpty_di" bpmnElement="EndEvent_PoolEmpty">
+        <dc:Bounds x="807" y="192" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_UpdateAnalytics_di" bpmnElement="Task_UpdateAnalytics">
+        <dc:Bounds x="1675" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_To_RequestNext_di" bpmnElement="Flow_Start_To_RequestNext">
+        <di:waypoint x="93" y="70" />
+        <di:waypoint x="175" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RequestNext_To_Reserve_di" bpmnElement="Flow_RequestNext_To_Reserve">
+        <di:waypoint x="275" y="70" />
+        <di:waypoint x="325" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Reserve_To_Gateway_di" bpmnElement="Flow_Reserve_To_Gateway">
+        <di:waypoint x="425" y="70" />
+        <di:waypoint x="500" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_To_Order_di" bpmnElement="Flow_Gateway_To_Order">
+        <di:waypoint x="550" y="70" />
+        <di:waypoint x="625" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Gateway_To_Block_di" bpmnElement="Flow_Gateway_To_Block">
+        <di:waypoint x="525" y="95" />
+        <di:waypoint x="525" y="210" />
+        <di:waypoint x="657" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Order_To_Bus_di" bpmnElement="Flow_Order_To_Bus">
+        <di:waypoint x="725" y="70" />
+        <di:waypoint x="775" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Bus_To_PublishPayment_di" bpmnElement="Flow_Bus_To_PublishPayment">
+        <di:waypoint x="875" y="70" />
+        <di:waypoint x="925" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PublishPayment_To_Bus_di" bpmnElement="Flow_PublishPayment_To_Bus">
+        <di:waypoint x="1025" y="70" />
+        <di:waypoint x="1075" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Payment_To_Correlate_di" bpmnElement="Flow_Payment_To_Correlate">
+        <di:waypoint x="1175" y="70" />
+        <di:waypoint x="1225" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Correlate_To_Stream_di" bpmnElement="Flow_Correlate_To_Stream">
+        <di:waypoint x="1325" y="70" />
+        <di:waypoint x="1375" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Stream_To_CRM_di" bpmnElement="Flow_Stream_To_CRM">
+        <di:waypoint x="1475" y="70" />
+        <di:waypoint x="1525" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Stream_To_BI_di" bpmnElement="Flow_Stream_To_BI">
+        <di:waypoint x="1425" y="110" />
+        <di:waypoint x="1425" y="210" />
+        <di:waypoint x="1675" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CRM_To_Send_di" bpmnElement="Flow_CRM_To_Send">
+        <di:waypoint x="1625" y="70" />
+        <di:waypoint x="1675" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CRM_To_End_di" bpmnElement="Flow_CRM_To_End">
+        <di:waypoint x="1775" y="70" />
+        <di:waypoint x="1857" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Block_To_End_di" bpmnElement="Flow_Block_To_End">
+        <di:waypoint x="693" y="210" />
+        <di:waypoint x="807" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_BI_To_End_di" bpmnElement="Flow_BI_To_End">
+        <di:waypoint x="1775" y="210" />
+        <di:waypoint x="1875" y="210" />
+        <di:waypoint x="1875" y="88" />
+      </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
-

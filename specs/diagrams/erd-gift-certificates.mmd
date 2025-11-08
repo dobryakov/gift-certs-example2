@@ -3,7 +3,7 @@ erDiagram
     GIFT_CERTIFICATE {
         string certificate_id PK
         string serial_number
-        string channel ENUM
+        string channel
         decimal face_value
         decimal remaining_balance
         string currency
@@ -18,7 +18,7 @@ erDiagram
     GIFT_CERTIFICATE_TRANSACTION {
         string transaction_id PK
         string certificate_id FK
-        string transaction_type ENUM
+        string transaction_type
         decimal amount
         string order_id
         string payment_id

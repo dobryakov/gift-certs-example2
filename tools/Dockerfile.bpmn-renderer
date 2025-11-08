@@ -1,0 +1,84 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    libstdc++ \
+    bash \
+    && npm install -g bpmn-to-image@0.9.0 bpmn-auto-layout@1.0.1 \
+    && printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/local/bin/chromium-no-sandbox \
+    && chmod +x /usr/local/bin/chromium-no-sandbox
+
+RUN cat <<'EOF' > /usr/local/bin/render-bpmn.mjs
+#!/usr/bin/env node
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
+import { spawn } from 'child_process';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { layoutProcess } = require('bpmn-auto-layout');
+
+const args = process.argv.slice(2);
+
+if (!args.length) {
+  console.error('Usage: render-bpmn <diagram.bpmn:outputs> [...]');
+  process.exit(1);
+}
+
+const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bpmn-layout-'));
+const mappedArgs = [];
+
+for (const arg of args) {
+  if (arg.startsWith('--')) {
+    mappedArgs.push(arg);
+    continue;
+  }
+
+  const separatorIndex = arg.indexOf(':');
+
+  if (separatorIndex === -1) {
+    console.error(`Expected ":" in argument: ${arg}`);
+    process.exit(1);
+  }
+
+  const inputPath = path.resolve(arg.slice(0, separatorIndex));
+  const outputSpec = arg.slice(separatorIndex + 1);
+
+  const xml = await fs.readFile(inputPath, 'utf8');
+  const layouted = await layoutProcess(xml);
+  const tempFile = path.join(tempDir, path.basename(inputPath));
+
+  await fs.writeFile(tempFile, layouted, 'utf8');
+  mappedArgs.push(`${tempFile}:${outputSpec}`);
+}
+
+await new Promise((resolve, reject) => {
+  const child = spawn('bpmn-to-image', mappedArgs, { stdio: 'inherit' });
+  child.on('exit', code => {
+    if (code === 0) {
+      resolve();
+    } else {
+      reject(new Error(`bpmn-to-image exited with code ${code}`));
+    }
+  });
+  child.on('error', reject);
+});
+EOF
+
+RUN printf '#!/bin/sh\nexec node /usr/local/bin/render-bpmn.mjs "$@"\n' > /usr/local/bin/render-bpmn \
+    && chmod +x /usr/local/bin/render-bpmn /usr/local/bin/render-bpmn.mjs
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium-no-sandbox \
+    NODE_PATH=/usr/local/lib/node_modules
+
+WORKDIR /workspace
+
+USER node
+
+ENTRYPOINT ["render-bpmn"]
