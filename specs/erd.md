@@ -7,6 +7,10 @@
   - `code` (уникальный, индекс)
   - `type` (Electronic/Physical)
   - `status`
+  - `channel_type` (nullable до продажи)
+  - `sold_at` (nullable)
+  - `sold_by` (nullable)
+  - `unique_sale_token` (UUID, уникальный, nullable)
   - `nominal_amount`
   - `balance`
   - `currency`
@@ -41,6 +45,8 @@
   - `reserved_amount`
   - `currency`
   - `channel`
+  - `channel_type`
+  - `operator_id` (nullable)
   - `expires_at`
   - `status`
 
@@ -62,10 +68,8 @@
 - Все денежные значения хранятся в минимальной денежной единице (копейки) и пересчитываются в API.
 - История операций хранится в `gift_certificate_operation` и связывается с аудитом для обогащения событий.
 - Таблица `authorization_hold` обеспечивает идемпотентность и контроль срока действия резервов.
+- Уникальность продажи обеспечивается ограничением `gift_certificate.code` + `status in (Sold, Active, Redeemed, Cancelled)` и `unique_sale_token`, который фиксирует канал и оператора продажи.
 
 ## Связи
 
-- `gift_certificate` 1:N `gift_certificate_operation`.
-- `gift_certificate` 1:N `authorization_hold`.
-- `gift_certificate_operation` 1:1 `audit_log` (опционально).
-- Внешние связи: `client_id` → `CRM.All_Clients`, `order_id` → `Orders`, `payment_id` → `Payments` через события и справочные словари.
+- `gift_certificate`

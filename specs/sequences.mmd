@@ -9,13 +9,23 @@ sequenceDiagram
 
   OS->>ORD: Создание заказа (Gift Certificate)
   ORD-->>GC: Event All_SalesOrder
-  OS->>PAY: Инициировать оплату
-  PAY-->>GC: Event All_Payments (полная оплата)
-  GC->>GC: Сопоставить заказ и оплату
-  GC->>GC: Изменить статус сертификата на Active
-  GC-->>SMS: Отправить CVC по SMS
-  GC-->>BI: Publish GiftCertificateTransaction(Activate)
-  GC-->>Kafka: Publish GiftCertificateState
+  OS->>GC: POST /certificates/{code}/authorize
+  alt Код уже продан
+    GC-->>OS: 409 CodeAlreadySold
+  else Код свободен
+    GC->>GC: Резервировать код за каналом
+    GC-->>OS: AuthorizationId, резерв подтверждён
+    loop Частичные оплаты
+      OS->>PAY: Подтвердить оплату
+      PAY-->>GC: Event All_Payments (version N, outstandingAmount > 0)
+      GC->>GC: Обновить агрегированные суммы
+    end
+    PAY-->>GC: Event All_Payments (isOrderSettled=true, outstandingAmount = 0)
+    GC->>GC: Изменить статус сертификата на Active
+    GC-->>SMS: Отправить CVC по SMS
+    GC-->>BI: Publish GiftCertificateTransaction(Activate)
+    GC-->>Kafka: Publish GiftCertificateState
+  end
 
   alt Частичная оплата заказом
     OS->>GC: POST /certificates/{code}/authorize

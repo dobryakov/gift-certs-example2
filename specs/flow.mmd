@@ -20,7 +20,12 @@ flowchart TD
   Validate --|Ошибка|--> DLQ
   Validate --|Успех|--> IssueNode
   IssueNode --> WaitSaleNode
-  WaitSaleNode -->|Order + Payment| Activate
+  WaitSaleNode --> UniqueCheck
+  UniqueCheck --|Да|--> RejectNode
+  UniqueCheck --|Нет|--> AuthorizeNode
+  AuthorizeNode --> SettleNode
+  SettleNode --> Activate
+  RejectNode --> End
   Activate --> NotifySMS
   Activate --> Available
   Available -->|Authorize| AuthorizeNode

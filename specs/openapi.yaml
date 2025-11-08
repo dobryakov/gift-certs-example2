@@ -57,7 +57,11 @@ paths:
         '404':
           description: Сертификат не найден
         '409':
-          description: Сертификат в недопустимом статусе
+          description: Сертификат в недопустимом статусе (например, код уже реализован другим каналом)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /certificates/{code}/authorize:
     post:
       summary: Резервирование суммы перед оплатой
@@ -82,7 +86,11 @@ paths:
         '404':
           description: Сертификат не найден
         '409':
-          description: Недостаточный баланс или конфликт статуса
+          description: Недостаточный баланс или конфликт статуса (включая повторную продажу кода)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /certificates/{code}/capture:
     post:
       summary: Списание зарезервированной суммы после удачной оплаты
@@ -128,7 +136,11 @@ paths:
         '404':
           description: Сертификат или операция не найдены
         '409':
-          description: Конфликт статуса
+          description: Конфликт статуса (например, операция уже аннулирована)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /certificates/{code}/balance:
     get:
       summary: Получение баланса сертификата
@@ -424,3 +436,15 @@ components:
               type: string
             notes:
               type: string
+    ErrorResponse:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: CodeAlreadySold
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: string
