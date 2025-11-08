@@ -141,6 +141,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /certificates/{code}/refund:
+    post:
+      summary: Инициирование возврата остатка сертификата
+      operationId: refundCertificate
+      parameters:
+        - $ref: '#/components/parameters/CertificateCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '200':
+          description: Возврат зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '202':
+          description: Возврат принят к обработке, ожидается событие Payments
+        '400':
+          description: Некорректные параметры или отсутствует остаток
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Сертификат не найден
+        '409':
+          description: Возврат уже инициирован или сертификат в неподходящем статусе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /certificates/{code}/balance:
     get:
       summary: Получение баланса сертификата
@@ -353,6 +388,7 @@ components:
             - Active
             - PartiallyRedeemed
             - Redeemed
+            - RefundPending
             - Refunded
             - Cancelled
         nominalAmount:
@@ -393,6 +429,8 @@ components:
             type: string
         allocation:
           $ref: '#/components/schemas/CertificateAllocation'
+        refund:
+          $ref: '#/components/schemas/RefundInfo'
     GiftCertificateOperation:
       type: object
       properties:
@@ -407,6 +445,7 @@ components:
             - Capture
             - Void
             - Refund
+            - RefundRequested
         amount:
           type: number
           format: double
@@ -423,6 +462,9 @@ components:
           type: string
           nullable: true
         paymentId:
+          type: string
+          nullable: true
+        refundRequestId:
           type: string
           nullable: true
         orderLineId:
@@ -464,6 +506,55 @@ components:
             - FullyFunded
         lastPaymentEventId:
           type: string
+    RefundRequest:
+      type: object
+      required:
+        - channel
+        - initiatedBy
+        - preferredMethod
+      properties:
+        channel:
+          type: string
+          description: Канал, в котором инициирован возврат (OnlineStore или POS)
+        initiatedBy:
+          type: string
+          description: Идентификатор пользователя или сервиса
+        preferredMethod:
+          type: string
+          description: Предпочтительный способ возврата
+          enum:
+            - OriginalInstrument
+            - AlternativeInstrument
+        alternativeDetails:
+          type: object
+          description: Реквизиты клиента для альтернативного возврата (если preferredMethod=AlternativeInstrument)
+          additionalProperties:
+            type: string
+        comment:
+          type: string
+          description: Дополнительное пояснение оператора
+    RefundInfo:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - None
+            - Pending
+            - AlternateDetailsRequired
+            - Completed
+        requestedAmount:
+          type: number
+          format: double
+        currency:
+          type: string
+        preferredMethod:
+          type: string
+        paymentReference:
+          type: string
+        lastUpdatedAt:
+          type: string
+          format: date-time
     ErrorResponse:
       type: object
       properties:

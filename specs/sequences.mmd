@@ -28,17 +28,19 @@ sequenceDiagram
     GC-->>Kafka: Publish GiftCertificateState
   end
 
-  alt Частичная оплата заказом
-    OS->>GC: POST /certificates/{code}/authorize
-    GC-->>OS: AuthorizationId, доступный баланс
-    OS->>PAY: Подтвердить оплату
-    PAY->>GC: POST /certificates/{code}/capture
-    GC->>GC: Списать сумму, обновить баланс
-    GC-->>BI: Publish GiftCertificateTransaction(Capture)
-    GC-->>Kafka: Publish GiftCertificateState
-  else Отмена
-    PAY->>GC: POST /certificates/{code}/void
-    GC->>GC: Восстановить баланс
-    GC-->>BI: Publish GiftCertificateTransaction(Void)
-    GC-->>Kafka: Publish GiftCertificateState
-  end
+  OS->>GC: POST /certificates/{code}/authorize (списание на покупку)
+  GC-->>OS: AuthorizationId, доступный баланс
+  OS->>PAY: Подтвердить оплату
+  PAY->>GC: POST /certificates/{code}/capture
+  GC->>GC: Списать сумму, обновить баланс
+  GC-->>BI: Publish GiftCertificateTransaction(Capture)
+  GC-->>Kafka: Publish GiftCertificateState
+
+  OS->>GC: POST /certificates/{code}/refund (online возврат)
+  GC->>GC: Создать refund_request, статус RefundPending
+  GC-->>Kafka: Publish GiftCertificateTransaction(RefundRequested)
+  GC-->>PAY: Emit RefundInitiated (All_Payments)
+  PAY-->>GC: Event All_Payments(paymentStatus=RefundSettled)
+  GC->>GC: Обнулить баланс, статус Refunded
+  GC-->>Kafka: Publish GiftCertificateTransaction(Refund)
+  GC-->>Kafka: Publish GiftCertificateState(Refunded)

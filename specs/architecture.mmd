@@ -17,8 +17,8 @@ flowchart LR
 
   Kafka{{Kafka}}
 
-  A -- authorize/capture --> GC
-  B -- authorize/capture --> GC
+  A -- authorize/capture/refund --> GC
+  B -- authorize/capture/refund --> GC
   BL -- batch upload --> GC
   PAY -- All_Payments (certificateAllocations) --> Kafka
   ORD -- All_SalesOrder (certificateLines) --> Kafka
@@ -32,6 +32,7 @@ flowchart LR
   GC -- GiftCertificateState --> Kafka
   GC -- GiftCertificateTransaction --> Kafka
   GC -- GiftCertificateBI --> Kafka
+  GC -- RefundInitiated --> PAY
   GC -- SMS CVC --> SMS
   GC -- баланс/статус --> A
   GC -- баланс/статус --> B

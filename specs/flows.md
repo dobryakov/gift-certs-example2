@@ -19,6 +19,14 @@
 - После подтверждения платежа выполняется `capture`.
 - При откате операции выполняется `void`, восстанавливается баланс.
 
+## Процесс возврата сертификата
+
+- Инициатор (кассир POS или покупатель в веб-интерфейсе) вызывает `POST /certificates/{code}/refund`, передавая канал и предпочтительный способ возврата.
+- `GiftCertificateProcessing` проверяет остаток, заносит запрос в `refund_request`, публикует `GiftCertificateTransaction(RefundRequested)` и переводит сертификат в статус `RefundPending`.
+- Сервис инициирует возврат в `Payments`, опубликованное событие `All_Payments` имеет `paymentStatus=RefundInitiated`, включает `refundDetails` и `orderLineId`.
+- После поступления `RefundSettled` баланс обнуляется, создаётся операция `Refund`, статус обновляется на `Refunded`, публикуются `GiftCertificateState(Refunded)` и `GiftCertificateTransaction(Refund)`.
+- Если требуется альтернативный способ перечисления средств, `refund_request` переводится в `AlternateDetailsRequired`, фронт запрашивает реквизиты у клиента, после чего процесс продолжается.
+
 ## Процесс интеграции с BI
 
 - CDC/ETL подписывается на `GiftCertificateBI`.

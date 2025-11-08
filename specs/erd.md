@@ -73,6 +73,20 @@
   - `allocation_status` (Planned/PartiallyFunded/FullyFunded)
   - `last_payment_event_id`
 
+- `refund_request`
+  - `id` (UUID, PK)
+  - `certificate_id` (FK -> gift_certificate)
+  - `order_line_id` (UUID, nullable)
+  - `requested_amount`
+  - `currency`
+  - `channel`
+  - `initiated_by`
+  - `preferred_method`
+  - `status` (Pending/AlternateDetailsRequired/Completed)
+  - `payment_reference` (nullable)
+  - `created_at`
+  - `updated_at`
+
 ## Особенности моделирования
 
 - Все денежные значения хранятся в минимальной денежной единице (копейки) и пересчитываются в API.
@@ -80,6 +94,7 @@
 - Таблица `authorization_hold` обеспечивает идемпотентность и контроль срока действия резервов.
 - Уникальность продажи обеспечивается ограничением `gift_certificate.code` + `status in (Sold, Active, Redeemed, Cancelled)` и `unique_sale_token`, который фиксирует канал и оператора продажи.
 - `order_certificate_allocation` фиксирует пожелания покупателя по суммам, накапливает поступившие платежи и служит триггером для активации после полной оплаты заказа.
+- `refund_request` хранит жизненный цикл возврата и связывает события Payments с сертификатом.
 
 ## Связи
 

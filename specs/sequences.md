@@ -19,9 +19,10 @@
 4. Сервис уменьшает баланс, фиксирует операцию, публикует `GiftCertificateTransaction(Capture)` и обновлённое состояние.
 5. События потребляются `Payments`, `Orders`, `BI Pipeline` для синхронизации.
 
-## Сценарий 3. Возврат/аннулирование списания
+## Сценарий 3. Возврат сертификата
 
-1. Инициирующий сервис (`Payments` или поддержка) вызывает `POST /certificates/{code}/void` с идентификатором операции.
-2. `GiftCertificateProcessing` проверяет возможность возврата, восстанавливает баланс, создаёт новую запись операции `Void`.
-3. Публикуется `GiftCertificateTransaction(Void)` и обновлённый `GiftCertificateState`.
-4. `BI Pipeline` и другие подписчики фиксируют событие для отчётности и аудита.
+1. Кассир POS или покупатель в веб-интерфейсе вызывает `POST /certificates/{code}/refund`, указывая канал возврата и предпочтительный способ перечисления средств.
+2. `GiftCertificateProcessing` проверяет остаток, создаёт запись `refund_request`, фиксирует операцию `RefundPending`, статус сертификата меняется на `RefundPending`.
+3. Сервис публикует `GiftCertificateTransaction(RefundRequested)` и инициирует событие `All_Payments` с `paymentStatus=RefundInitiated`, `refundDetails` и `orderLineId`.
+4. После того как `Payments` обработает возврат и опубликует `All_Payments` с `paymentStatus=RefundSettled`, `GiftCertificateProcessing` обнуляет баланс, создаёт операцию `Refund`, статус меняется на `Refunded`.
+5. Публикуются `GiftCertificateState(Refunded)` и `GiftCertificateTransaction(Refund)`, `BI Pipeline` фиксирует информацию для отчётности.

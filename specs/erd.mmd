@@ -2,6 +2,7 @@ erDiagram
   GIFT_CERTIFICATE ||--o{ GIFT_CERTIFICATE_OPERATION : "has"
   GIFT_CERTIFICATE ||--o{ AUTHORIZATION_HOLD : "reserves"
   GIFT_CERTIFICATE ||--o{ ORDER_CERTIFICATE_ALLOCATION : "plannedFor"
+  GIFT_CERTIFICATE ||--o{ REFUND_REQUEST : "refunds"
   GIFT_CERTIFICATE_OPERATION }o--|| AUDIT_LOG : "recorded"
 
   GIFT_CERTIFICATE {
@@ -58,6 +59,21 @@ erDiagram
     string currency
     string allocation_status
     string last_payment_event_id
+  }
+
+  REFUND_REQUEST {
+    uuid id PK
+    uuid certificate_id FK
+    string order_line_id
+    decimal requested_amount
+    string currency
+    string channel
+    string initiated_by
+    string preferred_method
+    string status
+    string payment_reference
+    datetime created_at
+    datetime updated_at
   }
 
   AUDIT_LOG {

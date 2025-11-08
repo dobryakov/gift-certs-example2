@@ -19,6 +19,13 @@ flowchart TD
   AllocationCheck{Заказ полностью оплачен?}
   Publish(["Публикация событий State/Transaction"])
   BI(["Передача в BI"])
+  RefundRequest(["Запрос возврата сертификата"])
+  RefundCheck{Есть остаток?}
+  RefundRecord(["Создание refund_request, статус RefundPending"])
+  RefundInitiate(["Emit RefundInitiated в All_Payments"])
+  AltDetails{Нужны реквизиты клиента?}
+  RefundAwait(["Ожидание RefundSettled"])
+  RefundComplete(["Обнуление баланса, статус Refunded"])
   End(["Конец"])
 
   Start --> Upload
@@ -43,5 +50,15 @@ flowchart TD
   CaptureNode --> Publish
   Available -->|Void запрос| VoidNode
   VoidNode --> Publish
+  Available -->|Refund| RefundRequest
+  RefundRequest --> RefundCheck
+  RefundCheck --|Нет|--> End
+  RefundCheck --|Да|--> RefundRecord
+  RefundRecord --> RefundInitiate
+  RefundInitiate --> AltDetails
+  AltDetails --|Да|--> RefundAwait
+  AltDetails --|Нет|--> RefundAwait
+  RefundAwait --> RefundComplete
+  RefundComplete --> Publish
   Publish --> BI
   BI --> End
