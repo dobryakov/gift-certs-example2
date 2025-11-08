@@ -1,0 +1,64 @@
+%% Mermaid ER diagram: модель данных подарочных сертификатов
+erDiagram
+    GIFT_CERTIFICATE {
+        string certificate_id PK
+        string serial_number
+        string channel ENUM
+        decimal face_value
+        decimal remaining_balance
+        string currency
+        date issued_at
+        date expires_at
+        string status
+        string customer_id FK
+        string originating_order_id FK
+        string pending_refund_details
+    }
+
+    GIFT_CERTIFICATE_TRANSACTION {
+        string transaction_id PK
+        string certificate_id FK
+        string transaction_type ENUM
+        decimal amount
+        string order_id
+        string payment_id
+        string channel
+        string performed_by
+        datetime performed_at
+        string note
+    }
+
+    CHANNEL_CONSTRAINT {
+        string channel PK
+        boolean allow_partial_redeem
+        boolean allow_cross_channel
+        string allowed_pos_region
+        string allowed_online_domain
+    }
+
+    CUSTOMER_REF {
+        string customer_id PK
+        string loyalty_id
+        string crm_profile_id
+    }
+
+    ORDER_REF {
+        string order_id PK
+        string channel
+        string status
+    }
+
+    PAYMENT_REF {
+        string payment_id PK
+        string method
+        string status
+        string original_payment_id
+    }
+
+    GIFT_CERTIFICATE ||--o{ GIFT_CERTIFICATE_TRANSACTION : "has"
+    GIFT_CERTIFICATE }o--|| CUSTOMER_REF : "belongs_to"
+    GIFT_CERTIFICATE }o--|| ORDER_REF : "originated_by"
+    GIFT_CERTIFICATE_TRANSACTION }o--|| ORDER_REF : "linked_to"
+    GIFT_CERTIFICATE_TRANSACTION }o--|| PAYMENT_REF : "refund/payment"
+    GIFT_CERTIFICATE ||--|| CHANNEL_CONSTRAINT : "channel_rule"
+

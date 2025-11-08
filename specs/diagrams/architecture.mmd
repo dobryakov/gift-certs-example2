@@ -1,0 +1,40 @@
+%% Mermaid diagram: архитектура взаимодействия сервисов и Kafka-топиков
+flowchart LR
+    subgraph OnlineChannel["Онлайн канал (ИМ)"]
+        IM["Internet Store"]
+    end
+    subgraph OfflineChannel["Оффлайн канал (POS)"]
+        POS["POS"]
+    end
+    subgraph CoreServices["Корпоративные сервисы"]
+        GCP["Сервис Процессинга Подарочных Сертификатов"]
+        ORD["Orders"]
+        PAY["Payments"]
+        CRM["CRM"]
+    end
+    BI["BI Platform"]
+
+    IM -- "produce\nGiftCertificate.Commands" --> GCP
+    POS -- "produce\nGiftCertificate.Commands" --> GCP
+    GCP -- "consume\nGiftCertificate.Commands" --> GCP
+
+    GCP -- "produce\nGiftCertificates.State" --> IM
+    GCP -- "produce\nGiftCertificates.State" --> POS
+    GCP -- "produce\nGiftCertificates.State" --> BI
+
+    GCP -- "produce\nGiftCertificate.Notifications" --> CRM
+    CRM -- "send CVC\n(письмо/SMS)" --> IM
+
+    GCP -- "produce\nGiftCertificate.Audit" --> BI
+
+    ORD -- "produce\nAll_SalesOrder" --> GCP
+    PAY -- "produce\nAll_Payments" --> GCP
+    CRM -- "produce\nAll_Clients" --> GCP
+
+    GCP -- "enrich orders\npublish All_SalesOrder" --> BI
+    GCP -- "enrich payments\npublish All_Payments" --> BI
+    GCP -- "publish\nGiftCertificates.State" --> BI
+
+    PAY <-- "refund command\nvia HTTP" --> GCP
+    ORD <-- "order linkage\nvia HTTP" --> GCP
+

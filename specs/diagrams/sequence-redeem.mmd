@@ -1,0 +1,20 @@
+%% Mermaid sequence diagram: частичное списание подарочного сертификата в оффлайн-канале
+sequenceDiagram
+    participant Customer
+    participant POS
+    participant GCP as Gift Certificate Processing
+    participant ORD as Orders
+    participant PAY as Payments
+    participant BI
+
+    Customer->>POS: Покупка товара с сертификатом
+    POS->>GCP: Команда redeemPartial (GiftCertificate.Commands)
+    GCP->>GCP: Проверка канала, остатка, статуса
+    GCP->>ORD: HTTP запрос на связывание заказа и сертификата
+    ORD-->>GCP: Подтверждение
+    GCP->>PAY: HTTP запрос на доплату оставшейся суммы
+    PAY-->>GCP: Результат платежа
+    GCP->>POS: Событие GiftCertificates.State (channel=OFFLINE, redeemedPartial)
+    GCP->>BI: Событие GiftCertificate.Audit (redeem_partial)
+    GCP->>ORD: Публикация enriched заказа в All_SalesOrder
+

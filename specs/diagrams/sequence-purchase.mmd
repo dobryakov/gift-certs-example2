@@ -1,0 +1,21 @@
+%% Mermaid sequence diagram: покупка подарочного сертификата в онлайн-канале
+sequenceDiagram
+    participant Customer
+    participant IM as Internet Store
+    participant GCP as Gift Certificate Processing
+    participant PAY as Payments
+    participant CRM
+    participant BI
+
+    Customer->>IM: Оформление заказа на сертификат
+    IM->>PAY: Запрос на авторизацию платежа
+    PAY-->>IM: Статус платежа (approved)
+    IM->>GCP: Команда issueCertificate (GiftCertificate.Commands)
+    GCP->>GCP: Генерация сертификата, CVC, правила канала
+    GCP->>PAY: HTTP запрос на фиксацию платежа
+    PAY-->>GCP: Подтверждение фиксации
+    GCP->>IM: Событие GiftCertificates.State (channel=ONLINE, issued)
+    GCP->>CRM: Событие GiftCertificate.Notifications (send CVC)
+    CRM-->>Customer: CVC код (email/SMS)
+    GCP->>BI: Событие GiftCertificate.Audit (issue)
+

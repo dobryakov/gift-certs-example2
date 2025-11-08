@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: Сервис Процессинга Подарочных Сертификатов API
+  version: 1.0.0
+  description: >
+    HTTP API предоставляет вспомогательные операции чтения и диагностические команды,
+    дополняющие событийное взаимодействие через Kafka-топики `GiftCertificate.*`.
+servers:
+  - url: https://gcp-service.internal/api/v1
+paths:
+  /certificates/{certificateId}:
+    get:
+      summary: Получить состояние сертификата
+      description: >
+        Позволяет каналам и службам поддержки получить последнюю агрегированную информацию
+        о подарочном сертификате и краткую историю транзакций.
+      parameters:
+        - name: certificateId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Уникальный идентификатор сертификата (`certificate_id`)
+        - name: includeTransactions
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Возвращать последние N транзакций
+        - name: transactionsLimit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Лимит записей истории
+      responses:
+        '200':
+          description: Состояние найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCertificateView'
+        '404':
+          description: Сертификат не найден
+        '400':
+          description: Некорректные параметры запроса
+        '500':
+          description: Внутренняя ошибка сервиса
+  /certificates:
+    get:
+      summary: Поиск сертификатов по фильтрам
+      description: >
+        Служебный эндпоинт для внутренних систем (CRM, поддержка) с возможностью фильтрации по каналу,
+        статусу, клиенту и заказу.
+      parameters:
+        - name: channel
+          in: query
+          schema:
+            type: string
+            enum:
+              - ONLINE
+              - OFFLINE
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - ISSUED
+              - PARTIALLY_REDEEMED
+              - REDEEMED
+              - REFUNDED
+              - LOCKED
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: originatingOrderId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Список сертификатов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GiftCertificateSummary'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '400':
+          description: Некорректные параметры фильтрации
+        '500':
+          description: Внутренняя ошибка сервиса
+  /certificates/{certificateId}/actions/lock:
+    post:
+      summary: Заблокировать сертификат для ручной проверки
+      description: >
+        Используется службой безопасности/поддержки в исключительных ситуациях. Обычный поток
+        использует события Kafka; HTTP служит override-инструментом.
+      parameters:
+        - name: certificateId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Причина блокировки
+                operatorId:
+                  type: string
+                  description: Идентификатор оператора/сотрудника
+              required:
+                - reason
+                - operatorId
+      responses:
+        '200':
+          description: Сертификат заблокирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCertificateView'
+        '404':
+          description: Сертификат не найден
+        '409':
+          description: Сертификат уже заблокирован или недоступен
+        '500':
+          description: Внутренняя ошибка сервиса
+components:
+  schemas:
+    GiftCertificateSummary:
+      type: object
+      properties:
+        certificateId:
+          type: string
+        serialNumber:
+          type: string
+        channel:
+          type: string
+          enum:
+            - ONLINE
+            - OFFLINE
+        status:
+          type: string
+        faceValue:
+          type: number
+          format: double
+        remainingBalance:
+          type: number
+          format: double
+        currency:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    GiftCertificateView:
+      allOf:
+        - $ref: '#/components/schemas/GiftCertificateSummary'
+        - type: object
+          properties:
+            customerId:
+              type: string
+            originatingOrderId:
+              type: string
+            pendingRefundDetails:
+              type: string
+              nullable: true
+            transactions:
+              type: array
+              items:
+                $ref: '#/components/schemas/GiftCertificateTransaction'
+    GiftCertificateTransaction:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        transactionType:
+          type: string
+          enum:
+            - ISSUE
+            - REDEEM_PARTIAL
+            - REDEEM_FULL
+            - REFUND
+            - ADJUSTMENT
+        amount:
+          type: number
+          format: double
+        orderId:
+          type: string
+        paymentId:
+          type: string
+        channel:
+          type: string
+        performedBy:
+          type: string
+        performedAt:
+          type: string
+          format: date-time
+        note:
+          type: string
+
