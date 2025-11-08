@@ -1,0 +1,63 @@
+erDiagram
+  GIFT_CERTIFICATE ||--o{ GIFT_CERTIFICATE_OPERATION : "has"
+  GIFT_CERTIFICATE ||--o{ AUTHORIZATION_HOLD : "reserves"
+  GIFT_CERTIFICATE_OPERATION }o--|| AUDIT_LOG : "recorded"
+
+  GIFT_CERTIFICATE {
+    uuid id PK
+    string code
+    string type
+    string status
+    decimal nominal_amount
+    decimal balance
+    string currency
+    string batch_id
+    string channel
+    string client_id
+    datetime issued_at
+    datetime activated_at
+    datetime expires_at
+    json metadata
+  }
+
+  GIFT_CERTIFICATE_OPERATION {
+    uuid id PK
+    uuid certificate_id FK
+    string type
+    decimal amount
+    string currency
+    string channel
+    datetime performed_at
+    string performed_by
+    string order_id
+    string payment_id
+    string authorization_id
+    decimal balance_before
+    decimal balance_after
+    uuid audit_id FK
+  }
+
+  AUTHORIZATION_HOLD {
+    uuid id PK
+    uuid certificate_id FK
+    string request_id
+    decimal reserved_amount
+    string currency
+    string channel
+    datetime expires_at
+    string status
+  }
+
+  AUDIT_LOG {
+    uuid id PK
+    string certificate_code
+    string operation_id
+    string action
+    string actor
+    string channel
+    string source
+    string trace_id
+    json payload_before
+    json payload_after
+    datetime created_at
+  }

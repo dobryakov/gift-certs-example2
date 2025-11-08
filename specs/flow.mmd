@@ -1,0 +1,32 @@
+flowchart TD
+  Start(["Начало"])
+  Upload(["Загрузка пакета сертификатов"])
+  Validate{Валидация пакета}
+  DLQ(["Запись в DLQ и уведомление"])
+  IssueNode(["Создание сертификатов Issued"])
+  WaitSaleNode(["Ожидание продажи"])
+  Activate(["Активация сертификата"])
+  NotifySMS(["Отправка SMS с CVC"])
+  Available(["Сертификат доступен для оплаты"])
+  AuthorizeNode(["Резервирование суммы"])
+  CaptureNode(["Списание"])
+  VoidNode(["Аннулирование / возврат"])
+  Publish(["Публикация событий State/Transaction"])
+  BI(["Передача в BI"])
+  End(["Конец"])
+
+  Start --> Upload
+  Upload --> Validate
+  Validate --|Ошибка|--> DLQ
+  Validate --|Успех|--> IssueNode
+  IssueNode --> WaitSaleNode
+  WaitSaleNode -->|Order + Payment| Activate
+  Activate --> NotifySMS
+  Activate --> Available
+  Available -->|Authorize| AuthorizeNode
+  AuthorizeNode -->|Capture| CaptureNode
+  CaptureNode --> Publish
+  Available -->|Void запрос| VoidNode
+  VoidNode --> Publish
+  Publish --> BI
+  BI --> End

@@ -1,0 +1,426 @@
+openapi: 3.0.3
+info:
+  title: Gift Certificate Processing API
+  version: 1.0.0
+  description: >-
+    API мастер-сервиса подарочных сертификатов. Предоставляет синхронные операции
+    загрузки, активации и управления балансом сертификатов для каналов интернет-магазина,
+    POS и платежного сервиса.
+servers:
+  - url: https://giftcerts.internal/api
+    description: Production endpoint
+  - url: https://giftcerts.sandbox/api
+    description: Sandbox endpoint
+security:
+  - serviceAuth: []
+paths:
+  /certificates/upload/batch:
+    post:
+      summary: Массовая загрузка предгенерированных сертификатов
+      operationId: uploadBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadBatchRequest'
+      responses:
+        '202':
+          description: Пакет принят к обработке
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchAcceptedResponse'
+        '400':
+          description: Ошибка валидации пакета
+        '409':
+          description: Пакет уже обработан
+  /certificates/{code}/activate:
+    post:
+      summary: Активация сертификата после полной оплаты
+      operationId: activateCertificate
+      parameters:
+        - $ref: '#/components/parameters/CertificateCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivationRequest'
+      responses:
+        '200':
+          description: Сертификат активирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCertificate'
+        '404':
+          description: Сертификат не найден
+        '409':
+          description: Сертификат в недопустимом статусе
+  /certificates/{code}/authorize:
+    post:
+      summary: Резервирование суммы перед оплатой
+      operationId: authorizeCertificate
+      parameters:
+        - $ref: '#/components/parameters/CertificateCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizationRequest'
+      responses:
+        '200':
+          description: Сумма успешно зарезервирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationResponse'
+        '400':
+          description: Некорректные параметры
+        '404':
+          description: Сертификат не найден
+        '409':
+          description: Недостаточный баланс или конфликт статуса
+  /certificates/{code}/capture:
+    post:
+      summary: Списание зарезервированной суммы после удачной оплаты
+      operationId: captureCertificate
+      parameters:
+        - $ref: '#/components/parameters/CertificateCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureRequest'
+      responses:
+        '200':
+          description: Списание успешно выполнено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '404':
+          description: Сертификат или авторизация не найдены
+        '409':
+          description: Конфликт состояния или сумма не зарезервирована
+  /certificates/{code}/void:
+    post:
+      summary: Аннулирование или возврат операции
+      operationId: voidCertificateOperation
+      parameters:
+        - $ref: '#/components/parameters/CertificateCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoidRequest'
+      responses:
+        '200':
+          description: Операция отменена, баланс восстановлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '404':
+          description: Сертификат или операция не найдены
+        '409':
+          description: Конфликт статуса
+  /certificates/{code}/balance:
+    get:
+      summary: Получение баланса сертификата
+      operationId: getCertificateBalance
+      parameters:
+        - $ref: '#/components/parameters/CertificateCode'
+      responses:
+        '200':
+          description: Текущий баланс возвращён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '404':
+          description: Сертификат не найден
+components:
+  securitySchemes:
+    serviceAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CertificateCode:
+      name: code
+      in: path
+      description: Уникальный код сертификата
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 32
+  schemas:
+    UploadBatchRequest:
+      type: object
+      required:
+        - batchId
+        - source
+        - certificates
+      properties:
+        batchId:
+          type: string
+          description: Идентификатор пакета загрузки
+        source:
+          type: string
+          description: Канал загрузки (например, MarketingCampaign)
+        certificates:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CertificateSeed'
+    CertificateSeed:
+      type: object
+      required:
+        - code
+        - nominalAmount
+        - currency
+        - cvc
+      properties:
+        code:
+          type: string
+          description: Предгенерированный код сертификата
+        nominalAmount:
+          type: number
+          format: double
+        currency:
+          type: string
+          example: RUB
+        cvc:
+          type: string
+          description: Секретный код для SMS
+        type:
+          type: string
+          description: Тип сертификата (Electronic или Physical)
+          default: Electronic
+    BatchAcceptedResponse:
+      type: object
+      properties:
+        batchId:
+          type: string
+        acceptedAt:
+          type: string
+          format: date-time
+    ActivationRequest:
+      type: object
+      required:
+        - orderId
+        - paymentId
+        - channel
+        - activatedBy
+      properties:
+        orderId:
+          type: string
+        paymentId:
+          type: string
+        channel:
+          type: string
+          description: Канал продажи (OnlineStore, POS)
+        activatedBy:
+          type: string
+          description: Идентификатор сервиса инициатора
+        clientId:
+          type: string
+          nullable: true
+    AuthorizationRequest:
+      type: object
+      required:
+        - amount
+        - currency
+        - channel
+        - requestId
+      properties:
+        requestId:
+          type: string
+          description: Идентификатор запроса/корреляции
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        channel:
+          type: string
+        orderId:
+          type: string
+          nullable: true
+        paymentId:
+          type: string
+          nullable: true
+        performedBy:
+          type: string
+          description: Пользователь/сервис, инициировавший авторизацию
+    AuthorizationResponse:
+      type: object
+      properties:
+        authorizationId:
+          type: string
+        code:
+          type: string
+        reservedAmount:
+          type: number
+          format: double
+        availableBalance:
+          type: number
+          format: double
+        currency:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    CaptureRequest:
+      type: object
+      required:
+        - authorizationId
+        - amount
+        - currency
+        - channel
+      properties:
+        authorizationId:
+          type: string
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        channel:
+          type: string
+        orderId:
+          type: string
+          nullable: true
+        paymentId:
+          type: string
+          nullable: true
+        performedBy:
+          type: string
+    VoidRequest:
+      type: object
+      required:
+        - operationId
+        - reason
+        - channel
+      properties:
+        operationId:
+          type: string
+        reason:
+          type: string
+        channel:
+          type: string
+        performedBy:
+          type: string
+    OperationResponse:
+      type: object
+      properties:
+        operation:
+          $ref: '#/components/schemas/GiftCertificateOperation'
+        certificate:
+          $ref: '#/components/schemas/GiftCertificate'
+    BalanceResponse:
+      type: object
+      properties:
+        certificate:
+          $ref: '#/components/schemas/GiftCertificate'
+    GiftCertificate:
+      type: object
+      properties:
+        code:
+          type: string
+        status:
+          type: string
+          enum:
+            - Issued
+            - Active
+            - PartiallyRedeemed
+            - Redeemed
+            - Refunded
+            - Cancelled
+        nominalAmount:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+        currency:
+          type: string
+        type:
+          type: string
+          enum:
+            - Electronic
+            - Physical
+        channel:
+          type: string
+        cvcMasked:
+          type: string
+          description: Маскированный CVC (например, **12)
+        issuedAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastOperationAt:
+          type: string
+          format: date-time
+          nullable: true
+        clientId:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    GiftCertificateOperation:
+      type: object
+      properties:
+        operationId:
+          type: string
+        type:
+          type: string
+          enum:
+            - Upload
+            - Activate
+            - Authorize
+            - Capture
+            - Void
+            - Refund
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        channel:
+          type: string
+        performedAt:
+          type: string
+          format: date-time
+        performedBy:
+          type: string
+        orderId:
+          type: string
+          nullable: true
+        paymentId:
+          type: string
+          nullable: true
+        balanceAfter:
+          type: number
+          format: double
+        audit:
+          type: object
+          properties:
+            sourceEvent:
+              type: string
+              description: Корреляция с событием Kafka или ID журнала
+            traceId:
+              type: string
+            notes:
+              type: string

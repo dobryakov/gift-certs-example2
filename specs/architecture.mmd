@@ -1,0 +1,37 @@
+flowchart LR
+  subgraph Channels
+    A[OnlineStore]
+    B[POS]
+  end
+
+  subgraph Core
+    GC[GiftCertificateProcessing]
+    BL[GiftCertificateBatchLoader]
+    PAY[Payments]
+    ORD[Orders]
+    CRM[CRM]
+  end
+
+  BI[BI Pipeline]
+  SMS[SMS Gateway]
+
+  Kafka{{Kafka}}
+
+  A -- authorize/capture --> GC
+  B -- authorize/capture --> GC
+  BL -- batch upload --> GC
+  PAY -- All_Payments --> Kafka
+  ORD -- All_SalesOrder --> Kafka
+  CRM -- All_Clients --> Kafka
+
+  Kafka -- GiftCertificateState --> GC
+  Kafka -- GiftCertificateTransaction --> BI
+  Kafka -- GiftCertificateBI --> BI
+
+  GC -- GiftCertificateState --> Kafka
+  GC -- GiftCertificateTransaction --> Kafka
+  GC -- GiftCertificateBI --> Kafka
+  GC -- SMS CVC --> SMS
+  PAY -- комбинированные платежи --> GC
+  GC -- баланс/статус --> A
+  GC -- баланс/статус --> B
