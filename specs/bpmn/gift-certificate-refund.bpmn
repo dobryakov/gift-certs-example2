@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_GiftCertificateRefund" targetNamespace="http://company.example/gift-certificates">
+  <bpmn:process id="Process_GiftCertificateRefund" name="Gift Certificate Refund" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Refund">
+      <bpmn:lane id="Lane_IM" name="Internet Store">
+        <bpmn:flowNodeRef>StartEvent_OnlineRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_RegisterRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_PublishRefundOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_PublishRefundPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_NotifyPending</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_CloseCase</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_POS" name="POS">
+        <bpmn:flowNodeRef>StartEvent_OfflineRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_RegisterRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_PublishRefundOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_PublishRefundPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_NotifyPending</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_CloseCase</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Support" name="Support Desk">
+        <bpmn:flowNodeRef>StartEvent_SupportRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Support_OpenCase</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Support_RequestManualRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Support_UpdateCase</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Support_CloseCase</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Orders" name="Orders">
+        <bpmn:flowNodeRef>Task_Orders_RouteOnlineRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Orders_RouteOfflineRefund</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Payments" name="Payments">
+        <bpmn:flowNodeRef>Task_Payments_ProcessOnlineRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Payments_ProcessOfflineRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Payments_ConfirmRefund</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_GCP" name="Сервис Процессинга Подарочных Сертификатов">
+        <bpmn:flowNodeRef>Task_GCP_CollectRefund</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_PublishPending</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_PendingNotify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_RefundSettlement</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IntermediateEvent_WaitSettlement</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_UpdateRefunded</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_PublishRefunded</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_RefundedNotify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_RefundedJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_RefundClosed</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_CRM" name="CRM">
+        <bpmn:flowNodeRef>Task_CRM_NotifyPending</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CRM_NotifyRefunded</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_BI" name="BI Platform">
+        <bpmn:flowNodeRef>Task_BI_UpdatePending</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BI_UpdateRefunded</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_OnlineRefund" name="Запрос возврата (ONLINE)">
+      <bpmn:outgoing>Flow_OnlineStart_To_Register</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_IM_RegisterRefund" name="Зарегистрировать возврат в UI">
+      <bpmn:incoming>Flow_OnlineStart_To_Register</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Register_To_Order</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_IM_PublishRefundOrder" name="Публикация возврата в All_SalesOrder">
+      <bpmn:incoming>Flow_IM_Register_To_Order</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Order_To_Orders</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Orders_RouteOnlineRefund" name="Orders: маршрутизация возврата (ONLINE)">
+      <bpmn:incoming>Flow_IM_Order_To_Orders</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrdersOnline_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_IM_PublishRefundPayment" name="Публикация возврата в All_Payments">
+      <bpmn:incoming>Flow_OrdersOnline_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Payment_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Payments_ProcessOnlineRefund" name="Payments: инициировать возврат (ONLINE)">
+      <bpmn:incoming>Flow_IM_Payment_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentsOnline_To_GCP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PaymentsOnline_To_Confirm</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:startEvent id="StartEvent_OfflineRefund" name="Возврат в магазине (OFFLINE)">
+      <bpmn:outgoing>Flow_OfflineStart_To_Register</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_POS_RegisterRefund" name="Зарегистрировать возврат (POS)">
+      <bpmn:incoming>Flow_OfflineStart_To_Register</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Register_To_Order</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_PublishRefundOrder" name="Публикация возврата в All_SalesOrder (POS)">
+      <bpmn:incoming>Flow_POS_Register_To_Order</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Order_To_Orders</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Orders_RouteOfflineRefund" name="Orders: маршрутизация возврата (OFFLINE)">
+      <bpmn:incoming>Flow_POS_Order_To_Orders</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrdersOffline_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_PublishRefundPayment" name="Публикация возврата в All_Payments (POS)">
+      <bpmn:incoming>Flow_OrdersOffline_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Payment_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Payments_ProcessOfflineRefund" name="Payments: инициировать возврат (OFFLINE)">
+      <bpmn:incoming>Flow_POS_Payment_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentsOffline_To_GCP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PaymentsOffline_To_Confirm</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:startEvent id="StartEvent_SupportRefund" name="Обращение клиента в поддержку">
+      <bpmn:outgoing>Flow_SupportStart_To_OpenCase</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_Support_OpenCase" name="Создать кейс поддержки">
+      <bpmn:incoming>Flow_SupportStart_To_OpenCase</bpmn:incoming>
+      <bpmn:outgoing>Flow_Support_Open_To_Request</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Support_RequestManualRefund" name="POST /certificates/{id}/actions/refund">
+      <bpmn:incoming>Flow_Support_Open_To_Request</bpmn:incoming>
+      <bpmn:outgoing>Flow_Support_Request_To_GCP</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_CollectRefund" name="Зафиксировать событие возврата">
+      <bpmn:incoming>Flow_PaymentsOnline_To_GCP</bpmn:incoming>
+      <bpmn:incoming>Flow_PaymentsOffline_To_GCP</bpmn:incoming>
+      <bpmn:incoming>Flow_Support_Request_To_GCP</bpmn:incoming>
+      <bpmn:outgoing>Flow_GCP_To_Pending</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_PublishPending" name="GiftCertificates.Stream: REFUND_PENDING">
+      <bpmn:incoming>Flow_GCP_To_Pending</bpmn:incoming>
+      <bpmn:outgoing>Flow_Pending_To_Notify</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_PendingNotify" name="Рассылка статуса REFUND_PENDING">
+      <bpmn:incoming>Flow_Pending_To_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Pending_To_IM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Pending_To_POS</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Pending_To_Support</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Pending_To_CRM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Pending_To_BI</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_IM_NotifyPending" name="Информировать клиента (ONLINE)">
+      <bpmn:incoming>Flow_Pending_To_IM</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Pending_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_NotifyPending" name="Информировать клиента (POS)">
+      <bpmn:incoming>Flow_Pending_To_POS</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Pending_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Support_UpdateCase" name="Обновить статус кейса">
+      <bpmn:incoming>Flow_Pending_To_Support</bpmn:incoming>
+      <bpmn:outgoing>Flow_Support_Pending_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_CRM_NotifyPending" name="CRM: уведомить клиента">
+      <bpmn:incoming>Flow_Pending_To_CRM</bpmn:incoming>
+      <bpmn:outgoing>Flow_CRM_Pending_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_BI_UpdatePending" name="Обновить витрины (refund pending)">
+      <bpmn:incoming>Flow_Pending_To_BI</bpmn:incoming>
+      <bpmn:outgoing>Flow_BI_Pending_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_RefundSettlement" name="Возврат завершён?">
+      <bpmn:incoming>Flow_IM_Pending_To_Gateway</bpmn:incoming>
+      <bpmn:incoming>Flow_POS_Pending_To_Gateway</bpmn:incoming>
+      <bpmn:incoming>Flow_Support_Pending_To_Gateway</bpmn:incoming>
+      <bpmn:incoming>Flow_CRM_Pending_To_Gateway</bpmn:incoming>
+      <bpmn:incoming>Flow_BI_Pending_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Settlement_Wait</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Settlement_Complete</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="IntermediateEvent_WaitSettlement" name="Подтверждение списания средств">
+      <bpmn:incoming>Flow_Settlement_Wait</bpmn:incoming>
+      <bpmn:outgoing>Flow_Wait_To_UpdateRefunded</bpmn:outgoing>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:task id="Task_Payments_ConfirmRefund" name="Payments: подтвердить возврат">
+      <bpmn:incoming>Flow_PaymentsOnline_To_Confirm</bpmn:incoming>
+      <bpmn:incoming>Flow_PaymentsOffline_To_Confirm</bpmn:incoming>
+      <bpmn:outgoing>Flow_Payments_To_Settlement</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow_Payments_To_Settlement" sourceRef="Task_Payments_ConfirmRefund" targetRef="IntermediateEvent_WaitSettlement"/>
+    <bpmn:task id="Task_GCP_UpdateRefunded" name="Обновить состояние сертификата">
+      <bpmn:incoming>Flow_Wait_To_UpdateRefunded</bpmn:incoming>
+      <bpmn:incoming>Flow_Settlement_Complete</bpmn:incoming>
+      <bpmn:outgoing>Flow_Update_To_PublishRefunded</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_PublishRefunded" name="GiftCertificates.Stream: REFUNDED">
+      <bpmn:incoming>Flow_Update_To_PublishRefunded</bpmn:incoming>
+      <bpmn:outgoing>Flow_Refunded_To_Notify</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_RefundedNotify" name="Рассылка статуса REFUNDED">
+      <bpmn:incoming>Flow_Refunded_To_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Refunded_To_IM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Refunded_To_POS</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Refunded_To_Support</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Refunded_To_CRM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Refunded_To_BI</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_IM_CloseCase" name="Закрыть возврат (ONLINE)">
+      <bpmn:incoming>Flow_Refunded_To_IM</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Refunded_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_CloseCase" name="Закрыть возврат (POS)">
+      <bpmn:incoming>Flow_Refunded_To_POS</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Refunded_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Support_CloseCase" name="Закрыть кейс поддержки">
+      <bpmn:incoming>Flow_Refunded_To_Support</bpmn:incoming>
+      <bpmn:outgoing>Flow_Support_Refunded_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_CRM_NotifyRefunded" name="CRM: подтвердить возврат клиенту">
+      <bpmn:incoming>Flow_Refunded_To_CRM</bpmn:incoming>
+      <bpmn:outgoing>Flow_CRM_Refunded_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_BI_UpdateRefunded" name="Обновить витрины (refund)">
+      <bpmn:incoming>Flow_Refunded_To_BI</bpmn:incoming>
+      <bpmn:outgoing>Flow_BI_Refunded_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_RefundedJoin" name="Синхронизация закрытия">
+      <bpmn:incoming>Flow_IM_Refunded_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_POS_Refunded_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_Support_Refunded_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_CRM_Refunded_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_BI_Refunded_To_Join</bpmn:incoming>
+      <bpmn:outgoing>Flow_Join_To_End</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="EndEvent_RefundClosed" name="Возврат завершён">
+      <bpmn:incoming>Flow_Join_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_OnlineStart_To_Register" sourceRef="StartEvent_OnlineRefund" targetRef="Task_IM_RegisterRefund"/>
+    <bpmn:sequenceFlow id="Flow_IM_Register_To_Order" sourceRef="Task_IM_RegisterRefund" targetRef="Task_IM_PublishRefundOrder"/>
+    <bpmn:sequenceFlow id="Flow_IM_Order_To_Orders" sourceRef="Task_IM_PublishRefundOrder" targetRef="Task_Orders_RouteOnlineRefund"/>
+    <bpmn:sequenceFlow id="Flow_OrdersOnline_To_Payments" sourceRef="Task_Orders_RouteOnlineRefund" targetRef="Task_IM_PublishRefundPayment"/>
+    <bpmn:sequenceFlow id="Flow_IM_Payment_To_Payments" sourceRef="Task_IM_PublishRefundPayment" targetRef="Task_Payments_ProcessOnlineRefund"/>
+    <bpmn:sequenceFlow id="Flow_OfflineStart_To_Register" sourceRef="StartEvent_OfflineRefund" targetRef="Task_POS_RegisterRefund"/>
+    <bpmn:sequenceFlow id="Flow_POS_Register_To_Order" sourceRef="Task_POS_RegisterRefund" targetRef="Task_POS_PublishRefundOrder"/>
+    <bpmn:sequenceFlow id="Flow_POS_Order_To_Orders" sourceRef="Task_POS_PublishRefundOrder" targetRef="Task_Orders_RouteOfflineRefund"/>
+    <bpmn:sequenceFlow id="Flow_OrdersOffline_To_Payments" sourceRef="Task_Orders_RouteOfflineRefund" targetRef="Task_POS_PublishRefundPayment"/>
+    <bpmn:sequenceFlow id="Flow_POS_Payment_To_Payments" sourceRef="Task_POS_PublishRefundPayment" targetRef="Task_Payments_ProcessOfflineRefund"/>
+    <bpmn:sequenceFlow id="Flow_SupportStart_To_OpenCase" sourceRef="StartEvent_SupportRefund" targetRef="Task_Support_OpenCase"/>
+    <bpmn:sequenceFlow id="Flow_Support_Open_To_Request" sourceRef="Task_Support_OpenCase" targetRef="Task_Support_RequestManualRefund"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOnline_To_GCP" sourceRef="Task_Payments_ProcessOnlineRefund" targetRef="Task_GCP_CollectRefund"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOnline_To_Confirm" sourceRef="Task_Payments_ProcessOnlineRefund" targetRef="Task_Payments_ConfirmRefund"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOffline_To_GCP" sourceRef="Task_Payments_ProcessOfflineRefund" targetRef="Task_GCP_CollectRefund"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOffline_To_Confirm" sourceRef="Task_Payments_ProcessOfflineRefund" targetRef="Task_Payments_ConfirmRefund"/>
+    <bpmn:sequenceFlow id="Flow_Support_Request_To_GCP" sourceRef="Task_Support_RequestManualRefund" targetRef="Task_GCP_CollectRefund"/>
+    <bpmn:sequenceFlow id="Flow_GCP_To_Pending" sourceRef="Task_GCP_CollectRefund" targetRef="Task_GCP_PublishPending"/>
+    <bpmn:sequenceFlow id="Flow_Pending_To_Notify" sourceRef="Task_GCP_PublishPending" targetRef="ParallelGateway_PendingNotify"/>
+    <bpmn:sequenceFlow id="Flow_Pending_To_IM" sourceRef="ParallelGateway_PendingNotify" targetRef="Task_IM_NotifyPending"/>
+    <bpmn:sequenceFlow id="Flow_IM_Pending_To_Gateway" sourceRef="Task_IM_NotifyPending" targetRef="Gateway_RefundSettlement"/>
+    <bpmn:sequenceFlow id="Flow_Pending_To_POS" sourceRef="ParallelGateway_PendingNotify" targetRef="Task_POS_NotifyPending"/>
+    <bpmn:sequenceFlow id="Flow_POS_Pending_To_Gateway" sourceRef="Task_POS_NotifyPending" targetRef="Gateway_RefundSettlement"/>
+    <bpmn:sequenceFlow id="Flow_Pending_To_Support" sourceRef="ParallelGateway_PendingNotify" targetRef="Task_Support_UpdateCase"/>
+    <bpmn:sequenceFlow id="Flow_Support_Pending_To_Gateway" sourceRef="Task_Support_UpdateCase" targetRef="Gateway_RefundSettlement"/>
+    <bpmn:sequenceFlow id="Flow_Pending_To_CRM" sourceRef="ParallelGateway_PendingNotify" targetRef="Task_CRM_NotifyPending"/>
+    <bpmn:sequenceFlow id="Flow_CRM_Pending_To_Gateway" sourceRef="Task_CRM_NotifyPending" targetRef="Gateway_RefundSettlement"/>
+    <bpmn:sequenceFlow id="Flow_Pending_To_BI" sourceRef="ParallelGateway_PendingNotify" targetRef="Task_BI_UpdatePending"/>
+    <bpmn:sequenceFlow id="Flow_BI_Pending_To_Gateway" sourceRef="Task_BI_UpdatePending" targetRef="Gateway_RefundSettlement"/>
+    <bpmn:sequenceFlow id="Flow_Settlement_Wait" sourceRef="Gateway_RefundSettlement" targetRef="IntermediateEvent_WaitSettlement"/>
+    <bpmn:sequenceFlow id="Flow_Wait_To_UpdateRefunded" sourceRef="IntermediateEvent_WaitSettlement" targetRef="Task_GCP_UpdateRefunded"/>
+    <bpmn:sequenceFlow id="Flow_Settlement_Complete" sourceRef="Gateway_RefundSettlement" targetRef="Task_GCP_UpdateRefunded"/>
+    <bpmn:sequenceFlow id="Flow_Update_To_PublishRefunded" sourceRef="Task_GCP_UpdateRefunded" targetRef="Task_GCP_PublishRefunded"/>
+    <bpmn:sequenceFlow id="Flow_Refunded_To_Notify" sourceRef="Task_GCP_PublishRefunded" targetRef="ParallelGateway_RefundedNotify"/>
+    <bpmn:sequenceFlow id="Flow_Refunded_To_IM" sourceRef="ParallelGateway_RefundedNotify" targetRef="Task_IM_CloseCase"/>
+    <bpmn:sequenceFlow id="Flow_IM_Refunded_To_Join" sourceRef="Task_IM_CloseCase" targetRef="ParallelGateway_RefundedJoin"/>
+    <bpmn:sequenceFlow id="Flow_Refunded_To_POS" sourceRef="ParallelGateway_RefundedNotify" targetRef="Task_POS_CloseCase"/>
+    <bpmn:sequenceFlow id="Flow_POS_Refunded_To_Join" sourceRef="Task_POS_CloseCase" targetRef="ParallelGateway_RefundedJoin"/>
+    <bpmn:sequenceFlow id="Flow_Refunded_To_Support" sourceRef="ParallelGateway_RefundedNotify" targetRef="Task_Support_CloseCase"/>
+    <bpmn:sequenceFlow id="Flow_Support_Refunded_To_Join" sourceRef="Task_Support_CloseCase" targetRef="ParallelGateway_RefundedJoin"/>
+    <bpmn:sequenceFlow id="Flow_Refunded_To_CRM" sourceRef="ParallelGateway_RefundedNotify" targetRef="Task_CRM_NotifyRefunded"/>
+    <bpmn:sequenceFlow id="Flow_CRM_Refunded_To_Join" sourceRef="Task_CRM_NotifyRefunded" targetRef="ParallelGateway_RefundedJoin"/>
+    <bpmn:sequenceFlow id="Flow_Refunded_To_BI" sourceRef="ParallelGateway_RefundedNotify" targetRef="Task_BI_UpdateRefunded"/>
+    <bpmn:sequenceFlow id="Flow_BI_Refunded_To_Join" sourceRef="Task_BI_UpdateRefunded" targetRef="ParallelGateway_RefundedJoin"/>
+    <bpmn:sequenceFlow id="Flow_Join_To_End" sourceRef="ParallelGateway_RefundedJoin" targetRef="EndEvent_RefundClosed"/>
+  </bpmn:process>
+</bpmn:definitions>
+

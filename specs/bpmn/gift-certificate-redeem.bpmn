@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_GiftCertificateRedeem" targetNamespace="http://company.example/gift-certificates">
+  <bpmn:process id="Process_GiftCertificateRedeem" name="Gift Certificate Redeem" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Redeem">
+      <bpmn:lane id="Lane_IM" name="Internet Store">
+        <bpmn:flowNodeRef>StartEvent_OnlineRedeem</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_CheckBalance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_PublishRedeemOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_PublishRedeemPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_UpdateBalance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_FinalizeOrder</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_POS" name="POS">
+        <bpmn:flowNodeRef>StartEvent_OfflineRedeem</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_CheckBalance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_PublishRedeemOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_PublishRedeemPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_UpdateBalance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_FinalizeReceipt</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Orders" name="Orders">
+        <bpmn:flowNodeRef>Task_Orders_RouteOnlineRedeem</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Orders_RouteOfflineRedeem</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Payments" name="Payments">
+        <bpmn:flowNodeRef>Task_Payments_ProcessOnlineRedeem</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Payments_ProcessOfflineRedeem</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_GCP" name="Сервис Процессинга Подарочных Сертификатов">
+        <bpmn:flowNodeRef>Task_GCP_CorrelateRedeem</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_RedeemType</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_UpdatePartial</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_PublishPartial</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_PartialNotify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MoreUsage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IntermediateEvent_WaitNext</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_UpdateFull</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_PublishFull</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_FullNotify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_RedeemCompleted</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_BI" name="BI Platform">
+        <bpmn:flowNodeRef>Task_BI_UpdatePartial</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BI_UpdateFull</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_OnlineRedeem" name="Checkout с сертификатом (ONLINE)">
+      <bpmn:outgoing>Flow_OnlineStart_To_Check</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_IM_CheckBalance" name="Проверить остаток сертификата">
+      <bpmn:incoming>Flow_OnlineStart_To_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Check_To_Order</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_IM_PublishRedeemOrder" name="Обновить заказ (All_SalesOrder)">
+      <bpmn:incoming>Flow_IM_Check_To_Order</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Order_To_Orders</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Orders_RouteOnlineRedeem" name="Orders: маршрутизация списания (ONLINE)">
+      <bpmn:incoming>Flow_IM_Order_To_Orders</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrdersOnline_To_Payment</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_IM_PublishRedeemPayment" name="Публикация списания в All_Payments">
+      <bpmn:incoming>Flow_OrdersOnline_To_Payment</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Payment_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Payments_ProcessOnlineRedeem" name="Payments: провести списание (ONLINE)">
+      <bpmn:incoming>Flow_IM_Payment_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentsOnline_To_GCP</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:startEvent id="StartEvent_OfflineRedeem" name="Продажа с сертификатом (OFFLINE)">
+      <bpmn:outgoing>Flow_OfflineStart_To_Check</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_POS_CheckBalance" name="Проверить остаток сертификата">
+      <bpmn:incoming>Flow_OfflineStart_To_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Check_To_Order</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_PublishRedeemOrder" name="Обновить чек (All_SalesOrder)">
+      <bpmn:incoming>Flow_POS_Check_To_Order</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Order_To_Orders</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Orders_RouteOfflineRedeem" name="Orders: маршрутизация списания (OFFLINE)">
+      <bpmn:incoming>Flow_POS_Order_To_Orders</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrdersOffline_To_Payment</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_PublishRedeemPayment" name="Публикация списания в All_Payments (POS)">
+      <bpmn:incoming>Flow_OrdersOffline_To_Payment</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Payment_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Payments_ProcessOfflineRedeem" name="Payments: провести списание (OFFLINE)">
+      <bpmn:incoming>Flow_POS_Payment_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentsOffline_To_GCP</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_CorrelateRedeem" name="Корреляция заказа и платежа">
+      <bpmn:incoming>Flow_PaymentsOnline_To_GCP</bpmn:incoming>
+      <bpmn:incoming>Flow_PaymentsOffline_To_GCP</bpmn:incoming>
+      <bpmn:outgoing>Flow_GCP_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_RedeemType" name="Полное списание?">
+      <bpmn:incoming>Flow_GCP_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Redeem_Full</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Redeem_Partial</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_GCP_UpdatePartial" name="Обновить остаток сертификата">
+      <bpmn:incoming>Flow_Redeem_Partial</bpmn:incoming>
+      <bpmn:outgoing>Flow_Partial_To_Stream</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_PublishPartial" name="GiftCertificates.Stream: PARTIALLY_REDEEMED">
+      <bpmn:incoming>Flow_Partial_To_Stream</bpmn:incoming>
+      <bpmn:outgoing>Flow_Partial_To_Notify</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_PartialNotify" name="Рассылка частичного списания">
+      <bpmn:incoming>Flow_Partial_To_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_PartialNotify_To_IM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PartialNotify_To_POS</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PartialNotify_To_BI</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_IM_UpdateBalance" name="Обновить UI (остаток)">
+      <bpmn:incoming>Flow_PartialNotify_To_IM</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Partial_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_UpdateBalance" name="Показать остаток (POS)">
+      <bpmn:incoming>Flow_PartialNotify_To_POS</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Partial_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_BI_UpdatePartial" name="Обновить витрины (partial)">
+      <bpmn:incoming>Flow_PartialNotify_To_BI</bpmn:incoming>
+      <bpmn:outgoing>Flow_BI_Partial_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_MoreUsage" name="Остался баланс?">
+      <bpmn:incoming>Flow_IM_Partial_To_Gateway</bpmn:incoming>
+      <bpmn:incoming>Flow_POS_Partial_To_Gateway</bpmn:incoming>
+      <bpmn:incoming>Flow_BI_Partial_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_MoreUsage_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_MoreUsage_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="IntermediateEvent_WaitNext" name="Следующее списание">
+      <bpmn:incoming>Flow_MoreUsage_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_WaitNext_To_Correlate</bpmn:outgoing>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:task id="Task_GCP_UpdateFull" name="Закрыть сертификат">
+      <bpmn:incoming>Flow_Redeem_Full</bpmn:incoming>
+      <bpmn:outgoing>Flow_Full_To_Stream</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_PublishFull" name="GiftCertificates.Stream: REDEEMED">
+      <bpmn:incoming>Flow_Full_To_Stream</bpmn:incoming>
+      <bpmn:outgoing>Flow_Full_To_Notify</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_FullNotify" name="Рассылка полного списания">
+      <bpmn:incoming>Flow_Full_To_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_FullNotify_To_IM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FullNotify_To_POS</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FullNotify_To_BI</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_IM_FinalizeOrder" name="Закрыть заказ (ONLINE)">
+      <bpmn:incoming>Flow_FullNotify_To_IM</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Full_To_End</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_FinalizeReceipt" name="Закрыть чек (POS)">
+      <bpmn:incoming>Flow_FullNotify_To_POS</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Full_To_End</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_BI_UpdateFull" name="Обновить витрины (redeemed)">
+      <bpmn:incoming>Flow_FullNotify_To_BI</bpmn:incoming>
+      <bpmn:outgoing>Flow_BI_Full_To_End</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="EndEvent_RedeemCompleted" name="Списание завершено">
+      <bpmn:incoming>Flow_MoreUsage_No</bpmn:incoming>
+      <bpmn:incoming>Flow_IM_Full_To_End</bpmn:incoming>
+      <bpmn:incoming>Flow_POS_Full_To_End</bpmn:incoming>
+      <bpmn:incoming>Flow_BI_Full_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_OnlineStart_To_Check" sourceRef="StartEvent_OnlineRedeem" targetRef="Task_IM_CheckBalance"/>
+    <bpmn:sequenceFlow id="Flow_IM_Check_To_Order" sourceRef="Task_IM_CheckBalance" targetRef="Task_IM_PublishRedeemOrder"/>
+    <bpmn:sequenceFlow id="Flow_IM_Order_To_Orders" sourceRef="Task_IM_PublishRedeemOrder" targetRef="Task_Orders_RouteOnlineRedeem"/>
+    <bpmn:sequenceFlow id="Flow_OrdersOnline_To_Payment" sourceRef="Task_Orders_RouteOnlineRedeem" targetRef="Task_IM_PublishRedeemPayment"/>
+    <bpmn:sequenceFlow id="Flow_IM_Payment_To_Payments" sourceRef="Task_IM_PublishRedeemPayment" targetRef="Task_Payments_ProcessOnlineRedeem"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOnline_To_GCP" sourceRef="Task_Payments_ProcessOnlineRedeem" targetRef="Task_GCP_CorrelateRedeem"/>
+    <bpmn:sequenceFlow id="Flow_OfflineStart_To_Check" sourceRef="StartEvent_OfflineRedeem" targetRef="Task_POS_CheckBalance"/>
+    <bpmn:sequenceFlow id="Flow_POS_Check_To_Order" sourceRef="Task_POS_CheckBalance" targetRef="Task_POS_PublishRedeemOrder"/>
+    <bpmn:sequenceFlow id="Flow_POS_Order_To_Orders" sourceRef="Task_POS_PublishRedeemOrder" targetRef="Task_Orders_RouteOfflineRedeem"/>
+    <bpmn:sequenceFlow id="Flow_OrdersOffline_To_Payment" sourceRef="Task_Orders_RouteOfflineRedeem" targetRef="Task_POS_PublishRedeemPayment"/>
+    <bpmn:sequenceFlow id="Flow_POS_Payment_To_Payments" sourceRef="Task_POS_PublishRedeemPayment" targetRef="Task_Payments_ProcessOfflineRedeem"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOffline_To_GCP" sourceRef="Task_Payments_ProcessOfflineRedeem" targetRef="Task_GCP_CorrelateRedeem"/>
+    <bpmn:sequenceFlow id="Flow_GCP_To_Gateway" sourceRef="Task_GCP_CorrelateRedeem" targetRef="Gateway_RedeemType"/>
+    <bpmn:sequenceFlow id="Flow_Redeem_Partial" sourceRef="Gateway_RedeemType" targetRef="Task_GCP_UpdatePartial"/>
+    <bpmn:sequenceFlow id="Flow_Partial_To_Stream" sourceRef="Task_GCP_UpdatePartial" targetRef="Task_GCP_PublishPartial"/>
+    <bpmn:sequenceFlow id="Flow_Partial_To_Notify" sourceRef="Task_GCP_PublishPartial" targetRef="ParallelGateway_PartialNotify"/>
+    <bpmn:sequenceFlow id="Flow_PartialNotify_To_IM" sourceRef="ParallelGateway_PartialNotify" targetRef="Task_IM_UpdateBalance"/>
+    <bpmn:sequenceFlow id="Flow_PartialNotify_To_POS" sourceRef="ParallelGateway_PartialNotify" targetRef="Task_POS_UpdateBalance"/>
+    <bpmn:sequenceFlow id="Flow_PartialNotify_To_BI" sourceRef="ParallelGateway_PartialNotify" targetRef="Task_BI_UpdatePartial"/>
+    <bpmn:sequenceFlow id="Flow_IM_Partial_To_Gateway" sourceRef="Task_IM_UpdateBalance" targetRef="Gateway_MoreUsage"/>
+    <bpmn:sequenceFlow id="Flow_POS_Partial_To_Gateway" sourceRef="Task_POS_UpdateBalance" targetRef="Gateway_MoreUsage"/>
+    <bpmn:sequenceFlow id="Flow_BI_Partial_To_Gateway" sourceRef="Task_BI_UpdatePartial" targetRef="Gateway_MoreUsage"/>
+    <bpmn:sequenceFlow id="Flow_MoreUsage_Yes" sourceRef="Gateway_MoreUsage" targetRef="IntermediateEvent_WaitNext"/>
+    <bpmn:sequenceFlow id="Flow_WaitNext_To_Correlate" sourceRef="IntermediateEvent_WaitNext" targetRef="Task_GCP_CorrelateRedeem"/>
+    <bpmn:sequenceFlow id="Flow_Redeem_Full" sourceRef="Gateway_RedeemType" targetRef="Task_GCP_UpdateFull"/>
+    <bpmn:sequenceFlow id="Flow_Full_To_Stream" sourceRef="Task_GCP_UpdateFull" targetRef="Task_GCP_PublishFull"/>
+    <bpmn:sequenceFlow id="Flow_Full_To_Notify" sourceRef="Task_GCP_PublishFull" targetRef="ParallelGateway_FullNotify"/>
+    <bpmn:sequenceFlow id="Flow_FullNotify_To_IM" sourceRef="ParallelGateway_FullNotify" targetRef="Task_IM_FinalizeOrder"/>
+    <bpmn:sequenceFlow id="Flow_FullNotify_To_POS" sourceRef="ParallelGateway_FullNotify" targetRef="Task_POS_FinalizeReceipt"/>
+    <bpmn:sequenceFlow id="Flow_FullNotify_To_BI" sourceRef="ParallelGateway_FullNotify" targetRef="Task_BI_UpdateFull"/>
+    <bpmn:sequenceFlow id="Flow_IM_Full_To_End" sourceRef="Task_IM_FinalizeOrder" targetRef="EndEvent_RedeemCompleted"/>
+    <bpmn:sequenceFlow id="Flow_POS_Full_To_End" sourceRef="Task_POS_FinalizeReceipt" targetRef="EndEvent_RedeemCompleted"/>
+    <bpmn:sequenceFlow id="Flow_BI_Full_To_End" sourceRef="Task_BI_UpdateFull" targetRef="EndEvent_RedeemCompleted"/>
+    <bpmn:sequenceFlow id="Flow_MoreUsage_No" sourceRef="Gateway_MoreUsage" targetRef="EndEvent_RedeemCompleted"/>
+  </bpmn:process>
+</bpmn:definitions>
+

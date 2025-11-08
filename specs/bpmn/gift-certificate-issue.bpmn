@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_GiftCertificateIssue" targetNamespace="http://company.example/gift-certificates">
+  <bpmn:process id="Process_GiftCertificateIssue" name="Gift Certificate Issue" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Issue">
+      <bpmn:lane id="Lane_IM" name="Internet Store">
+        <bpmn:flowNodeRef>StartEvent_OnlineRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_RequestNext</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_PublishOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_PublishPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IM_UpdateUI</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_POS" name="POS">
+        <bpmn:flowNodeRef>StartEvent_OfflineRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_RequestNext</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_PublishOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_PublishPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_POS_UpdatePOS</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Orders" name="Orders">
+        <bpmn:flowNodeRef>Task_Orders_RouteOnline</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Orders_RouteOffline</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Payments" name="Payments">
+        <bpmn:flowNodeRef>Task_Payments_RouteOnline</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Payments_RouteOffline</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_GCP" name="Сервис Процессинга Подарочных Сертификатов">
+        <bpmn:flowNodeRef>Task_GCP_Reserve</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_CertsAvailable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IntermediateEvent_IssueBlocked</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ChannelBranch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_Correlate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_PublishIssued</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_Notify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_MarkNotification</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GCP_PublishNotificationSent</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_IssueBlocked</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ParallelGateway_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_IssueCompleted</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_CRM" name="CRM">
+        <bpmn:flowNodeRef>Task_CRM_RequestCVC</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CRM_SendCVC</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_BI" name="BI Platform">
+        <bpmn:flowNodeRef>Task_BI_UpdateIssue</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_OnlineRequest" name="Оформление сертификата (ONLINE)">
+      <bpmn:outgoing>Flow_StartOnline_To_Request</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_IM_RequestNext" name="POST /certificates/next (ONLINE)">
+      <bpmn:incoming>Flow_StartOnline_To_Request</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Request_To_Reserve</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:startEvent id="StartEvent_OfflineRequest" name="Оформление сертификата (OFFLINE)">
+      <bpmn:outgoing>Flow_StartOffline_To_Request</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_POS_RequestNext" name="POST /certificates/next (OFFLINE)">
+      <bpmn:incoming>Flow_StartOffline_To_Request</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Request_To_Reserve</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_Reserve" name="Зарезервировать сертификат">
+      <bpmn:incoming>Flow_IM_Request_To_Reserve</bpmn:incoming>
+      <bpmn:incoming>Flow_POS_Request_To_Reserve</bpmn:incoming>
+      <bpmn:outgoing>Flow_Reserve_To_Gateway</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_CertsAvailable" name="Сертификаты доступны?">
+      <bpmn:incoming>Flow_Reserve_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Available_No</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Available_Yes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="IntermediateEvent_IssueBlocked" name="GiftCertificates.Stream: ISSUE_BLOCKED">
+      <bpmn:incoming>Flow_Available_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_IssueBlocked_To_End</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="EndEvent_IssueBlocked" name="Выдача заблокирована">
+      <bpmn:incoming>Flow_IssueBlocked_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gateway_ChannelBranch" name="Канал оформления">
+      <bpmn:incoming>Flow_Available_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Channel_To_Online</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Channel_To_Offline</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_IM_PublishOrder" name="Публикация заказа в All_SalesOrder">
+      <bpmn:incoming>Flow_Channel_To_Online</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Order_To_Orders</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Orders_RouteOnline" name="Orders: маршрутизация заказа (ONLINE)">
+      <bpmn:incoming>Flow_IM_Order_To_Orders</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrdersOnline_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_IM_PublishPayment" name="Публикация платежа в All_Payments">
+      <bpmn:incoming>Flow_OrdersOnline_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_Payment_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Payments_RouteOnline" name="Payments: маршрутизация (ONLINE)">
+      <bpmn:incoming>Flow_IM_Payment_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentsOnline_To_Correlate</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_PublishOrder" name="Публикация заказа в All_SalesOrder (POS)">
+      <bpmn:incoming>Flow_Channel_To_Offline</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Order_To_Orders</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Orders_RouteOffline" name="Orders: маршрутизация заказа (OFFLINE)">
+      <bpmn:incoming>Flow_POS_Order_To_Orders</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrdersOffline_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_PublishPayment" name="Публикация платежа в All_Payments (POS)">
+      <bpmn:incoming>Flow_OrdersOffline_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_Payment_To_Payments</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Payments_RouteOffline" name="Payments: маршрутизация (OFFLINE)">
+      <bpmn:incoming>Flow_POS_Payment_To_Payments</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentsOffline_To_Correlate</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_Correlate" name="Корреляция заказа и платежа">
+      <bpmn:incoming>Flow_PaymentsOnline_To_Correlate</bpmn:incoming>
+      <bpmn:incoming>Flow_PaymentsOffline_To_Correlate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Correlate_To_PublishIssued</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_PublishIssued" name="GiftCertificates.Stream: ISSUED + NOTIFICATION_REQUESTED">
+      <bpmn:incoming>Flow_Correlate_To_PublishIssued</bpmn:incoming>
+      <bpmn:outgoing>Flow_PublishIssued_To_Notify</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_Notify" name="Рассылка статуса">
+      <bpmn:incoming>Flow_PublishIssued_To_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Notify_To_IM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Notify_To_POS</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Notify_To_CRM</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Notify_To_BI</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_IM_UpdateUI" name="Получить статус GiftCertificate (ONLINE)">
+      <bpmn:incoming>Flow_Notify_To_IM</bpmn:incoming>
+      <bpmn:outgoing>Flow_IM_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_POS_UpdatePOS" name="Получить статус GiftCertificate (POS)">
+      <bpmn:incoming>Flow_Notify_To_POS</bpmn:incoming>
+      <bpmn:outgoing>Flow_POS_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_CRM_RequestCVC" name="GET /certificates/{id}/cvc">
+      <bpmn:incoming>Flow_Notify_To_CRM</bpmn:incoming>
+      <bpmn:outgoing>Flow_CRM_To_Send</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_CRM_SendCVC" name="Отправить CVC клиенту">
+      <bpmn:incoming>Flow_CRM_To_Send</bpmn:incoming>
+      <bpmn:outgoing>Flow_CRM_To_GCP</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_MarkNotification" name="Зафиксировать уведомление">
+      <bpmn:incoming>Flow_CRM_To_GCP</bpmn:incoming>
+      <bpmn:outgoing>Flow_GCP_To_NotificationSent</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_GCP_PublishNotificationSent" name="GiftCertificates.Stream: NOTIFICATION_SENT">
+      <bpmn:incoming>Flow_GCP_To_NotificationSent</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotificationSent_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_BI_UpdateIssue" name="Обновить витрины (issue)">
+      <bpmn:incoming>Flow_Notify_To_BI</bpmn:incoming>
+      <bpmn:outgoing>Flow_BI_To_Join</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:parallelGateway id="ParallelGateway_Join" name="Синхронизация каналов">
+      <bpmn:incoming>Flow_IM_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_POS_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_NotificationSent_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_BI_To_Join</bpmn:incoming>
+      <bpmn:outgoing>Flow_Join_To_End</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="EndEvent_IssueCompleted" name="Сертификат выпущен">
+      <bpmn:incoming>Flow_Join_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_StartOnline_To_Request" sourceRef="StartEvent_OnlineRequest" targetRef="Task_IM_RequestNext"/>
+    <bpmn:sequenceFlow id="Flow_IM_Request_To_Reserve" sourceRef="Task_IM_RequestNext" targetRef="Task_GCP_Reserve"/>
+    <bpmn:sequenceFlow id="Flow_StartOffline_To_Request" sourceRef="StartEvent_OfflineRequest" targetRef="Task_POS_RequestNext"/>
+    <bpmn:sequenceFlow id="Flow_POS_Request_To_Reserve" sourceRef="Task_POS_RequestNext" targetRef="Task_GCP_Reserve"/>
+    <bpmn:sequenceFlow id="Flow_Reserve_To_Gateway" sourceRef="Task_GCP_Reserve" targetRef="Gateway_CertsAvailable"/>
+    <bpmn:sequenceFlow id="Flow_Available_No" sourceRef="Gateway_CertsAvailable" targetRef="IntermediateEvent_IssueBlocked"/>
+    <bpmn:sequenceFlow id="Flow_IssueBlocked_To_End" sourceRef="IntermediateEvent_IssueBlocked" targetRef="EndEvent_IssueBlocked"/>
+    <bpmn:sequenceFlow id="Flow_Available_Yes" sourceRef="Gateway_CertsAvailable" targetRef="Gateway_ChannelBranch"/>
+    <bpmn:sequenceFlow id="Flow_Channel_To_Online" sourceRef="Gateway_ChannelBranch" targetRef="Task_IM_PublishOrder"/>
+    <bpmn:sequenceFlow id="Flow_Channel_To_Offline" sourceRef="Gateway_ChannelBranch" targetRef="Task_POS_PublishOrder"/>
+    <bpmn:sequenceFlow id="Flow_IM_Order_To_Orders" sourceRef="Task_IM_PublishOrder" targetRef="Task_Orders_RouteOnline"/>
+    <bpmn:sequenceFlow id="Flow_OrdersOnline_To_Payments" sourceRef="Task_Orders_RouteOnline" targetRef="Task_IM_PublishPayment"/>
+    <bpmn:sequenceFlow id="Flow_IM_Payment_To_Payments" sourceRef="Task_IM_PublishPayment" targetRef="Task_Payments_RouteOnline"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOnline_To_Correlate" sourceRef="Task_Payments_RouteOnline" targetRef="Task_GCP_Correlate"/>
+    <bpmn:sequenceFlow id="Flow_POS_Order_To_Orders" sourceRef="Task_POS_PublishOrder" targetRef="Task_Orders_RouteOffline"/>
+    <bpmn:sequenceFlow id="Flow_OrdersOffline_To_Payments" sourceRef="Task_Orders_RouteOffline" targetRef="Task_POS_PublishPayment"/>
+    <bpmn:sequenceFlow id="Flow_POS_Payment_To_Payments" sourceRef="Task_POS_PublishPayment" targetRef="Task_Payments_RouteOffline"/>
+    <bpmn:sequenceFlow id="Flow_PaymentsOffline_To_Correlate" sourceRef="Task_Payments_RouteOffline" targetRef="Task_GCP_Correlate"/>
+    <bpmn:sequenceFlow id="Flow_Correlate_To_PublishIssued" sourceRef="Task_GCP_Correlate" targetRef="Task_GCP_PublishIssued"/>
+    <bpmn:sequenceFlow id="Flow_PublishIssued_To_Notify" sourceRef="Task_GCP_PublishIssued" targetRef="ParallelGateway_Notify"/>
+    <bpmn:sequenceFlow id="Flow_Notify_To_IM" sourceRef="ParallelGateway_Notify" targetRef="Task_IM_UpdateUI"/>
+    <bpmn:sequenceFlow id="Flow_IM_To_Join" sourceRef="Task_IM_UpdateUI" targetRef="ParallelGateway_Join"/>
+    <bpmn:sequenceFlow id="Flow_Notify_To_POS" sourceRef="ParallelGateway_Notify" targetRef="Task_POS_UpdatePOS"/>
+    <bpmn:sequenceFlow id="Flow_POS_To_Join" sourceRef="Task_POS_UpdatePOS" targetRef="ParallelGateway_Join"/>
+    <bpmn:sequenceFlow id="Flow_Notify_To_CRM" sourceRef="ParallelGateway_Notify" targetRef="Task_CRM_RequestCVC"/>
+    <bpmn:sequenceFlow id="Flow_CRM_To_Send" sourceRef="Task_CRM_RequestCVC" targetRef="Task_CRM_SendCVC"/>
+    <bpmn:sequenceFlow id="Flow_CRM_To_GCP" sourceRef="Task_CRM_SendCVC" targetRef="Task_GCP_MarkNotification"/>
+    <bpmn:sequenceFlow id="Flow_GCP_To_NotificationSent" sourceRef="Task_GCP_MarkNotification" targetRef="Task_GCP_PublishNotificationSent"/>
+    <bpmn:sequenceFlow id="Flow_NotificationSent_To_Join" sourceRef="Task_GCP_PublishNotificationSent" targetRef="ParallelGateway_Join"/>
+    <bpmn:sequenceFlow id="Flow_Notify_To_BI" sourceRef="ParallelGateway_Notify" targetRef="Task_BI_UpdateIssue"/>
+    <bpmn:sequenceFlow id="Flow_BI_To_Join" sourceRef="Task_BI_UpdateIssue" targetRef="ParallelGateway_Join"/>
+    <bpmn:sequenceFlow id="Flow_Join_To_End" sourceRef="ParallelGateway_Join" targetRef="EndEvent_IssueCompleted"/>
+  </bpmn:process>
+</bpmn:definitions>
+
